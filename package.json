@@ -1,0 +1,11 @@
+{
+  "name": "stroykontrol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "СтройКонтроль — учёт себестоимости, расходов и ЗП по строительству частных домов (PWA).",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "serve": "python3 -m http.server 8000"
+  }
+}

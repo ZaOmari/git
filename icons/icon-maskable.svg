@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- full-bleed background for maskable safe area -->
+  <rect width="512" height="512" fill="#0a84ff"/>
+  <!-- glyph kept within the central ~80% safe zone -->
+  <polygon points="256,168 364,256 148,256" fill="#ffffff"/>
+  <rect x="176" y="256" width="160" height="120" rx="8" fill="#ffffff"/>
+  <path d="M216 320l28 28 54-64" fill="none" stroke="#0a84ff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
