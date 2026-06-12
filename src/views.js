@@ -28,7 +28,7 @@ export function listScreen(state) {
   const allUnpaid = homes.reduce((s, h) => s + unpaid(h), 0);
   const summarySub = `${homes.length} объекта · к оплате поставщикам ${fmt(allUnpaid)}`;
 
-  const cards = homes.map((h) => {
+  const cards = homes.map((h, _hi) => {
     const tot = total(h);
     const up = unpaid(h);
     const hasPrice = h.type === 'contract' && h.price;
@@ -50,7 +50,7 @@ export function listScreen(state) {
       : '';
 
     return `
-      <div data-action="openHome" data-id="${h.id}" style="margin:0 16px 12px;background:#fff;border-radius:20px;padding:16px 16px 14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);cursor:pointer">
+      <div ${_hi === 0 ? 'id="sk-tour-card"' : ''} data-action="openHome" data-id="${h.id}" style="margin:0 16px 12px;background:#fff;border-radius:20px;padding:16px 16px 14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);cursor:pointer">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
           <div style="min-width:0">
             <div style="font-size:17px;font-weight:600;color:#1c1c1e;letter-spacing:-0.3px;line-height:1.2">${esc(h.name)}</div>
@@ -89,7 +89,7 @@ export function listScreen(state) {
           ${headerAvatars()}
         </div>
       </div>
-      <div style="margin:14px 16px 8px;background:#1c1c1e;border-radius:22px;padding:18px 20px;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.16)">
+      <div id="sk-tour-summary" style="margin:14px 16px 8px;background:#1c1c1e;border-radius:22px;padding:18px 20px;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.16)">
         <div style="font-size:13px;font-weight:500;color:rgba(235,235,245,0.6);letter-spacing:-0.1px">Себестоимость всех объектов</div>
         <div style="font-size:36px;font-weight:700;letter-spacing:-1px;margin-top:3px;line-height:1.05">${fmt(allTotal)}</div>
         <div style="font-size:13px;color:rgba(235,235,245,0.55);margin-top:6px">${esc(summarySub)}</div>
@@ -167,7 +167,7 @@ export function objectScreen(state) {
         ${up > 0 ? `<div style="font-size:13px;color:#c2410c;font-weight:500;margin-top:4px">из них к оплате поставщикам ${fmt(up)}</div>` : ''}
         ${heroExtra}
       </div>
-      <div style="margin:18px 16px 0;background:rgba(118,118,128,0.12);border-radius:9px;padding:2px;display:flex;gap:2px">${segs}</div>
+      <div id="sk-tour-tabs" style="margin:18px 16px 0;background:rgba(118,118,128,0.12);border-radius:9px;padding:2px;display:flex;gap:2px">${segs}</div>
       ${tabContent}
     </div>`;
 }
@@ -201,7 +201,7 @@ function objectTab(state, h) {
           </div>
         </div>`;
     }).join('');
-    return `<div style="margin:14px 16px 0;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04)">${rows}</div>`;
+    return `<div id="sk-tour-expenses" style="margin:14px 16px 0;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04)">${rows}</div>`;
   }
 
   if (tab === 'crews') {
@@ -375,7 +375,7 @@ export function fab(state, animate = false) {
   if (!show) return '';
   const anim = animate ? 'animation:sk-pop 0.25s ease' : '';
   return `
-    <div data-action="openFab" style="position:absolute;right:18px;bottom:44px;z-index:30;display:flex;align-items:center;gap:9px;height:54px;padding:0 20px 0 17px;background:#0a84ff;border-radius:27px;box-shadow:0 6px 18px rgba(10,132,255,0.4),0 2px 5px rgba(0,0,0,0.12);cursor:pointer;${anim}">
+    <div id="sk-fab-btn" data-action="openFab" style="position:absolute;right:18px;bottom:44px;z-index:30;display:flex;align-items:center;gap:9px;height:54px;padding:0 20px 0 17px;background:#0a84ff;border-radius:27px;box-shadow:0 6px 18px rgba(10,132,255,0.4),0 2px 5px rgba(0,0,0,0.12);cursor:pointer;${anim}">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>
       <span style="color:#fff;font-size:16px;font-weight:600;letter-spacing:-0.2px">Расход</span>
     </div>`;
@@ -425,7 +425,7 @@ export function sheet(state, animate = false) {
           <span style="font-size:17px;font-weight:600;color:#1c1c1e">Новый расход</span>
           <span style="font-size:17px;color:rgba(60,60,67,0.3);width:54px;text-align:right">·</span>
         </div>
-        <div style="margin:0 16px;background:#fff;border-radius:18px;padding:18px 18px">
+        <div id="sk-tour-amount" style="margin:0 16px;background:#fff;border-radius:18px;padding:18px 18px">
           <div style="font-size:12px;color:rgba(60,60,67,0.6);font-weight:500">Сумма</div>
           <div style="display:flex;align-items:baseline;gap:6px;margin-top:2px">
             <input value="${esc(amountDisplay)}" data-input="amount" inputmode="numeric" placeholder="0" style="border:none;outline:none;font-size:40px;font-weight:700;letter-spacing:-1px;color:#1c1c1e;background:transparent;font-family:inherit;width:100%;min-width:0;font-variant-numeric:tabular-nums" />

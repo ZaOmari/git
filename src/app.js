@@ -4,6 +4,7 @@
 // imperatively so an in-progress drawing survives state changes.
 import { seedHomes, STAGES } from './data.js';
 import { listScreen, objectScreen, actScreen, fab, sheet, toast } from './views.js';
+import { initTour, getTourNode } from './tour.js';
 
 const state = {
   screen: 'list',          // 'list' | 'object' | 'act'
@@ -54,6 +55,10 @@ function render() {
   if (scrollEl) scrollEl.scrollTop = prevScreen === state.screen ? prevTop : 0;
 
   if (state.screen === 'act') wireSignature();
+
+  // re-attach tour overlay if it's still active (app.innerHTML wipes it)
+  const tn = getTourNode();
+  if (tn) app.appendChild(tn);
 
   prevScreen = state.screen;
   prevSheetOpen = state.sheet === 'expense';
@@ -209,6 +214,10 @@ app.addEventListener('input', (e) => {
 });
 
 render();
+initTour(app, {
+  openHome: (id) => { state.screen = 'object'; state.homeId = id; state.tab = 'expenses'; render(); },
+  openSheet: () => openSheet(),
+});
 
 // ── PWA: register the offline service worker when served over http(s) ──
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
