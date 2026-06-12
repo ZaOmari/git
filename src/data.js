@@ -36,7 +36,7 @@ export function seedHomes() {
       ],
       clientPayments: [{ d: '12 апр', a: 2500000, escrow: true }, { d: '20 мая', a: 2000000, escrow: true }],
       notes: [
-        { id: 'n1', date: '06.06', text: 'Ключи у прораба, заезд со стороны леса', photo: true },
+        { id: 'n1', date: '06.06', text: 'Ключи у прораба, заезд со стороны леса', photo: true, pinned: false },
       ],
     },
     {
@@ -51,7 +51,7 @@ export function seedHomes() {
       crews: [{ id: 'c3', work: 'Монтаж кровли', agreed: 240000, payouts: [{ d: '06.06', a: 120000 }] }],
       clientPayments: [],
       notes: [
-        { id: 'n2', date: '02.06', text: 'Показ покупателям в субботу в 12:00', photo: false },
+        { id: 'n2', date: '02.06', text: 'Показ покупателям в субботу в 12:00', photo: false, pinned: false },
       ],
     },
     {
@@ -71,8 +71,8 @@ export function seedHomes() {
       ],
       clientPayments: [{ d: '10 мар', a: 5000000, escrow: true }, { d: '15 апр', a: 4000000, escrow: true }, { d: '22 мая', a: 3000000, escrow: false }],
       notes: [
-        { id: 'n3', date: '07.06', text: 'Код от ворот — 4471', photo: false },
-        { id: 'n4', date: '05.06', text: 'Не шуметь до 9:00 — просьба соседей', photo: false },
+        { id: 'n3', date: '07.06', text: 'Код от ворот — 4471', photo: false, pinned: true },
+        { id: 'n4', date: '05.06', text: 'Не шуметь до 9:00 — просьба соседей', photo: false, pinned: false },
       ],
     },
   ];

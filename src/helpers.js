@@ -28,6 +28,13 @@ export const totalObligations = (homes) => homes.reduce((s, h) => s + obligation
 // Маржа дома на продажу: цена продажи − себестоимость (null, если цены нет).
 export const margin = (h) => (h.type === 'spec' && h.price ? h.price - total(h) : null);
 
+// ── Заметки ──
+export const pinnedNote = (h) => (h.notes || []).find((n) => n.pinned) || null;
+// Превью свёрнутой полосы: закреплённая, иначе самая свежая (массив — новые сверху).
+export const previewNote = (h) => { const ns = h.notes || []; return pinnedNote(h) || ns[0] || null; };
+// Сколько заметок кроме показанной в превью.
+export const otherNotesCount = (h) => { const ns = h.notes || []; return ns.length > 1 ? ns.length - 1 : 0; };
+
 export const catStyle = (cat) => {
   const c = CAT_COLOR[cat] || CAT_COLOR['Прочее'];
   return `font-size:11px;font-weight:600;padding:2px 8px;border-radius:7px;background:${c[0]};color:${c[1]}`;

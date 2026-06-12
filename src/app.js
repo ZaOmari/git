@@ -10,6 +10,7 @@ const state = {
   screen: 'list',          // 'list' | 'object' | 'act'
   homeId: null,
   tab: 'expenses',
+  notesOpen: false,        // раскрыта ли полоса заметок под себестоимостью
   sheet: null,             // 'expense' | 'note' | null
   toast: null,
   signed: false,
@@ -176,7 +177,6 @@ function saveNote() {
   };
   state.homes = state.homes.map((h) => h.id === hid ? { ...h, notes: [note, ...(h.notes || [])] } : h);
   state.sheet = null;
-  state.tab = 'notes';
   showToast('Заметка сохранена · видит Таня');
 }
 
@@ -189,7 +189,15 @@ function openAct() {
 }
 
 const actions = {
-  openHome: (el) => { state.screen = 'object'; state.homeId = el.dataset.id; state.tab = 'expenses'; render(); },
+  openHome: (el) => { state.screen = 'object'; state.homeId = el.dataset.id; state.tab = 'expenses'; state.notesOpen = false; render(); },
+  toggleNotes: () => { state.notesOpen = !state.notesOpen; render(); },
+  togglePin: (el) => {
+    const id = el.dataset.id;
+    state.homes = state.homes.map((h) => h.id === state.homeId
+      ? { ...h, notes: (h.notes || []).map((n) => ({ ...n, pinned: n.id === id ? !n.pinned : false })) }
+      : h);
+    render();
+  },
   back: () => { state.screen = 'list'; render(); },
   setTab: (el) => { state.tab = el.dataset.tab; render(); },
   openFab: () => openSheet(state.screen === 'object' ? state.homeId : null),
@@ -271,6 +279,7 @@ function tourSaveDemo() {
   state.screen = 'object';
   state.homeId = DEMO_HOME;
   state.tab = 'expenses';
+  state.notesOpen = false;
   showToast('Сохранено · видит Таня');
 }
 
@@ -278,7 +287,7 @@ initTour(app, {
   goList: () => { state.screen = 'list'; state.sheet = null; state.homeId = null; render(); },
   openSheet: tourOpenSheet,
   saveDemo: tourSaveDemo,
-  openHome: (id, tab) => { state.screen = 'object'; state.sheet = null; state.homeId = id; state.tab = tab || 'expenses'; render(); },
+  openHome: (id, tab) => { state.screen = 'object'; state.sheet = null; state.homeId = id; state.tab = tab || 'expenses'; state.notesOpen = false; render(); },
   setTab: (k) => { state.tab = k; render(); },
 });
 

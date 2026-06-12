@@ -2,7 +2,7 @@
 // СтройКонтроль design. Interactivity is wired through data-action / data-input
 // attributes (see app.js for the delegated handlers).
 import { STAGES, CATS, CAT_COLOR } from './data.js';
-import { fmt, fmtShort, total, unpaid, crewRemain, totalObligations, margin, catStyle, badge, barColor, esc } from './helpers.js';
+import { fmt, fmtShort, total, unpaid, totalObligations, margin, previewNote, otherNotesCount, catStyle, badge, barColor, esc } from './helpers.js';
 
 const avatar = (letter, bg, size = 28, ml = 0, border = true) =>
   `<span style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:#fff;font-size:${size === 28 ? 13 : 12}px;font-weight:600;display:flex;align-items:center;justify-content:center;${border ? 'border:2px solid #f2f2f7;' : ''}${ml ? `margin-left:${ml}px;` : ''}">${letter}</span>`;
@@ -156,11 +156,11 @@ export function objectScreen(state) {
     heroExtra = `<div style="margin-top:14px;font-size:13px;color:rgba(60,60,67,0.6);line-height:1.4">Объект на продажу — клиента нет. Цена и маржа задаются во вкладке «Продажа».</div>`;
   }
 
-  // segmented tabs (+ Заметки)
+  // segmented tabs
   const tabs = isContract
-    ? [['expenses', 'Расходы'], ['crews', 'Бригады'], ['stages', 'Этапы'], ['notes', 'Заметки'], ['client', 'Оплаты']]
-    : [['expenses', 'Расходы'], ['crews', 'Бригады'], ['stages', 'Этапы'], ['notes', 'Заметки'], ['sale', 'Продажа']];
-  const segBase = 'flex:1;text-align:center;padding:7px 3px;border-radius:7px;font-size:12.5px;letter-spacing:-0.2px;cursor:pointer;';
+    ? [['expenses', 'Расходы'], ['crews', 'Бригады'], ['stages', 'Этапы'], ['client', 'Оплаты']]
+    : [['expenses', 'Расходы'], ['crews', 'Бригады'], ['stages', 'Этапы'], ['sale', 'Продажа']];
+  const segBase = 'flex:1;text-align:center;padding:7px 4px;border-radius:7px;font-size:13px;letter-spacing:-0.1px;cursor:pointer;';
   const segs = tabs.map(([k, l]) => {
     const active = state.tab === k;
     const style = active
@@ -195,9 +195,68 @@ export function objectScreen(state) {
         ${up > 0 ? `<div style="font-size:13px;color:#c2410c;font-weight:500;margin-top:4px">из них к оплате поставщикам ${fmt(up)}</div>` : ''}
         ${heroExtra}
       </div>
+      ${notesStrip(state, h)}
       <div id="sk-tour-tabs" style="margin:18px 16px 0;background:rgba(118,118,128,0.12);border-radius:9px;padding:2px;display:flex;gap:2px">${segs}</div>
       ${tabContent}
     </div>`;
+}
+
+// ░░░░░ ПОЛОСА ЗАМЕТОК (под себестоимостью) ░░░░░
+// Свёрнуто — одна строка с превью закреплённой/свежей заметки + быстрый «+».
+// Раскрыто — аккордеон со всеми заметками и закреплением (одна закреплённая).
+function notesStrip(state, h) {
+  const notes = h.notes || [];
+  const hasNotes = notes.length > 0;
+  const open = state.notesOpen && hasNotes;
+  const pv = previewNote(h);
+  const moreN = otherNotesCount(h);
+  const rowAction = hasNotes ? 'toggleNotes' : 'openNote';
+
+  const previewHtml = pv
+    ? `<span style="color:#1c1c1e;font-weight:500">${esc(pv.text)}</span>${moreN ? `<span style="color:rgba(60,60,67,0.45)"> · ещё ${moreN}</span>` : ''}`
+    : `<span style="color:rgba(60,60,67,0.4)">Заметок нет</span>`;
+
+  const plusBtn = `<div data-action="openNote" title="Добавить заметку" style="width:30px;height:30px;border-radius:50%;background:rgba(10,132,255,0.1);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#0a84ff" stroke-width="2.4" stroke-linecap="round"/></svg></div>`;
+
+  const chevron = hasNotes
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="transform:rotate(${open ? 180 : 0}deg);transition:transform .2s;flex-shrink:0"><path d="M6 9l6 6 6-6" stroke="rgba(60,60,67,0.4)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    : '';
+
+  const collapsedRow = `
+    <div data-action="${rowAction}" style="display:flex;align-items:center;gap:10px;min-height:46px;padding:6px 10px 6px 14px;cursor:pointer">
+      <span style="font-size:15px;flex-shrink:0">📌</span>
+      <div style="flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${previewHtml}</div>
+      ${plusBtn}
+      ${chevron}
+    </div>`;
+
+  let expanded = '';
+  if (open) {
+    const sorted = [...notes].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+    const items = sorted.map((n, idx) => {
+      const last = idx === sorted.length - 1;
+      const pinStyle = n.pinned
+        ? 'background:rgba(10,132,255,0.12)'
+        : 'background:transparent;opacity:0.38';
+      const metaBits = [esc(n.date)];
+      if (n.photo) metaBits.push('фото');
+      if (n.pinned) metaBits.push('закреплено');
+      return `
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;${last ? '' : 'border-bottom:0.5px solid rgba(60,60,67,0.08)'}">
+          <div data-action="togglePin" data-id="${n.id}" title="Закрепить" style="width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:14px;${pinStyle}">📌</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;color:#1c1c1e;line-height:1.35">${esc(n.text)}</div>
+            <div style="font-size:12px;color:rgba(60,60,67,0.5);margin-top:3px">${metaBits.join(' · ')}</div>
+          </div>
+        </div>`;
+    }).join('');
+    expanded = `
+      <div style="border-top:0.5px solid rgba(60,60,67,0.1);max-height:300px;overflow-y:auto">${items}</div>
+      <div data-action="toggleNotes" style="text-align:center;padding:10px;font-size:14px;color:#0a84ff;cursor:pointer;border-top:0.5px solid rgba(60,60,67,0.08)">Свернуть</div>`;
+  }
+
+  return `<div id="sk-tour-notes" style="margin:12px 16px 0;background:#fff;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,0.04);overflow:hidden">${collapsedRow}${expanded}</div>`;
 }
 
 function objectTab(state, h) {
@@ -294,34 +353,6 @@ function objectTab(state, h) {
         </div>`;
     }).join('');
     return `<div style="margin:14px 16px 0;background:#fff;border-radius:18px;padding:6px 18px 14px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">${rows}</div>`;
-  }
-
-  if (tab === 'notes') {
-    const notes = h.notes || [];
-    const list = notes.length
-      ? notes.map((n, idx) => {
-          const last = idx === notes.length - 1;
-          const photoTag = n.photo
-            ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:rgba(60,60,67,0.5);margin-top:6px">
-                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="15" rx="3" stroke="rgba(60,60,67,0.45)" stroke-width="2"/><circle cx="12" cy="13" r="3.5" stroke="rgba(60,60,67,0.45)" stroke-width="2"/><path d="M8 6l1.5-2.5h5L16 6" stroke="rgba(60,60,67,0.45)" stroke-width="2" stroke-linejoin="round"/></svg>
-                 фото
-               </span>` : '';
-          return `
-            <div style="padding:13px 16px;${last ? '' : 'border-bottom:0.5px solid rgba(60,60,67,0.08)'}">
-              <div style="font-size:15px;color:#1c1c1e;line-height:1.35">${esc(n.text)}</div>
-              <div style="font-size:12px;color:rgba(60,60,67,0.5);margin-top:4px">${esc(n.date)} · ${n.photo ? 'с фото' : 'заметка'}</div>
-              ${photoTag}
-            </div>`;
-        }).join('')
-      : `<div style="padding:22px 16px;text-align:center;font-size:14px;color:rgba(60,60,67,0.45)">Пока нет заметок. Коды, договорённости — сюда.</div>`;
-    return `
-      <div id="sk-tour-notes" style="margin:14px 16px 0">
-        <div style="background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04)">${list}</div>
-        <div data-action="openNote" style="margin-top:11px;height:48px;background:#fff;border-radius:15px;display:flex;align-items:center;justify-content:center;gap:7px;color:#0a84ff;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#0a84ff" stroke-width="2.4" stroke-linecap="round"/></svg>
-          Заметка
-        </div>
-      </div>`;
   }
 
   if (tab === 'client') {

@@ -4,7 +4,7 @@
 // a demo expense, switching tabs — so each highlight has live content.
 // After each app render(), app.js re-attaches getTourNode() to keep it visible.
 
-const STORAGE_KEY = 'sk-tour-v2';
+const STORAGE_KEY = 'sk-tour-v3';
 const CARD_H = 230;
 const PAD = 10;
 
@@ -62,11 +62,10 @@ const STEPS = [
     title: 'Бюджет на исходе',
     body: 'Себестоимость близко к стоимости по договору — приложение предупредит само.',
     targetId: 'sk-tour-warn',
-    onBeforeNext: () => _fns.setTab('notes'),
   },
   {
-    title: 'Заметки по объекту',
-    body: 'Коды, договорённости, что не забыть — в заметках по объекту.',
+    title: 'Заметки под рукой',
+    body: 'Коды и договорённости — закреплены прямо под себестоимостью, всегда под рукой. Плюс рядом — быстрая запись.',
     targetId: 'sk-tour-notes',
   },
 ];
