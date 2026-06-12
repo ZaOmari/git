@@ -1,6 +1,6 @@
 // Minimal offline-first service worker for the СтройКонтроль PWA.
 // Precaches the app shell; serves cached assets, falling back to network.
-const CACHE = 'stroykontrol-v1';
+const CACHE = 'stroykontrol-v2';
 const SHELL = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const SHELL = [
   './src/views.js',
   './src/helpers.js',
   './src/data.js',
+  './src/tour.js',
   './icons/icon.svg',
   './icons/icon-maskable.svg',
 ];
