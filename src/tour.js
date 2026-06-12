@@ -1,9 +1,11 @@
-// Interactive onboarding tour — shown once on first launch.
-// Navigates through screens as part of the tour by calling app-provided fns.
-// After each app render(), app.js re-attaches getTourNode() to keep tour visible.
+// Interactive demo tour — walks Таня/Гриша through the exact demo script.
+// Auto-shown once on first launch; re-launchable any time via the «?» header
+// button (startTour). It drives the real app: opening the expense form, saving
+// a demo expense, switching tabs — so each highlight has live content.
+// After each app render(), app.js re-attaches getTourNode() to keep it visible.
 
-const STORAGE_KEY = 'sk-tour-v1';
-const CARD_H = 216;
+const STORAGE_KEY = 'sk-tour-v2';
+const CARD_H = 230;
 const PAD = 10;
 
 let _appEl = null;
@@ -11,48 +13,61 @@ let _fns = {};
 let currentStep = 0;
 let tourEl = null;
 
-// onBeforeNext: called when the user clicks "Далее" on this step, before rendering the next.
-// It can trigger navigation (which calls app render()), so tourEl must be nulled first.
+// onBeforeNext: runs when the user taps «Далее», BEFORE the next step renders.
+// It may navigate (which calls app render()), so tourEl is nulled first.
 const STEPS = [
   {
-    title: 'Добро пожаловать!',
-    body: 'СтройКонтроль — учёт стройки для семейного бизнеса: расходы, бригады, этапы и акты.',
-  },
-  {
-    title: 'Общая себестоимость',
-    body: 'Суммарные затраты по всем объектам и сколько ещё не оплачено поставщикам.',
+    title: 'Одна картина по деньгам',
+    body: 'Главное — себестоимость всех домов и сколько ещё должны. Одна картина по деньгам.',
     targetId: 'sk-tour-summary',
   },
   {
-    title: 'Карточка объекта',
-    body: 'Нажмём — откроются расходы, бригады, этапы и оплаты клиента.',
-    targetId: 'sk-tour-card',
-    onBeforeNext: () => {
-      const el = document.getElementById('sk-tour-card');
-      if (el) _fns.openHome(el.dataset.id);
-    },
-  },
-  {
-    title: 'Список расходов',
-    body: 'Все траты: сумма, категория, дата и кто внёс. Красным — ещё не оплачено поставщику.',
-    targetId: 'sk-tour-expenses',
-  },
-  {
-    title: 'Расходы · Бригады · Этапы',
-    body: 'Переключайтесь между вкладками: договорённости с бригадами, статус этапов и акты.',
-    targetId: 'sk-tour-tabs',
-  },
-  {
-    title: '+ Расход',
-    body: 'Кнопка для добавления любой траты. Откроем форму.',
+    title: 'Расход за 5 секунд',
+    body: 'Купили материал? Жмёте плюс и пишете как говорите. Главное — не забыть записать, остальное приложение сделает само.',
     targetId: 'sk-fab-btn',
+    forceCardAt: 'top',
     onBeforeNext: () => _fns.openSheet(),
   },
   {
-    title: 'Форма расхода',
-    body: 'Введите сумму и описание — категория необязательна. Расход сразу увидит второй участник.',
-    targetId: 'sk-tour-amount',
+    title: 'Пишете свободно',
+    body: 'Пишете как удобно: бетон 26 кубов 312000. Категория необязательна.',
+    targetId: 'sk-tour-desc',
     forceCardAt: 'top',
+    onBeforeNext: () => _fns.saveDemo(),
+  },
+  {
+    title: 'Себестоимость сразу обновилась',
+    body: 'Сохранили — себестоимость сразу обновилась. И это видит второй партнёр.',
+    targetId: 'sk-tour-cost',
+    onBeforeNext: () => _fns.setTab('crews'),
+  },
+  {
+    title: 'Бригады и остатки',
+    body: 'По каждой бригаде: договорено, выплачено, остаток. Сразу видно, сколько ещё должны.',
+    targetId: 'sk-tour-remain',
+    onBeforeNext: () => _fns.setTab('expenses'),
+  },
+  {
+    title: 'Делёж чека',
+    body: 'Один чек на два дома? Делите сумму в пару тапов — материал кочует.',
+    targetId: 'sk-tour-split',
+    onBeforeNext: () => _fns.setTab('stages'),
+  },
+  {
+    title: 'Акт с подписью',
+    body: 'На встрече формируете акт, клиент расписывается пальцем, PDF уходит.',
+    targetId: 'sk-tour-act',
+  },
+  {
+    title: 'Бюджет на исходе',
+    body: 'Себестоимость близко к стоимости по договору — приложение предупредит само.',
+    targetId: 'sk-tour-warn',
+    onBeforeNext: () => _fns.setTab('notes'),
+  },
+  {
+    title: 'Заметки по объекту',
+    body: 'Коды, договорённости, что не забыть — в заметках по объекту.',
+    targetId: 'sk-tour-notes',
   },
 ];
 
@@ -79,6 +94,11 @@ function renderTour() {
   const s = STEPS[currentStep];
   const appH = _appEl.offsetHeight;
   const appW = _appEl.offsetWidth;
+  // ensure the target is scrolled into view before measuring
+  const targetEl = s.targetId ? document.getElementById(s.targetId) : null;
+  if (targetEl && targetEl.scrollIntoView) {
+    try { targetEl.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { targetEl.scrollIntoView(); }
+  }
   const rect = s.targetId ? getRelRect(s.targetId) : null;
   const isLast = currentStep === STEPS.length - 1;
 
@@ -90,9 +110,9 @@ function renderTour() {
   let overlayHtml = '';
   let ringHtml = '';
 
-  if (cardAt === 'center') {
+  if (cardAt === 'center' || !rect) {
     overlayHtml = `<div style="${ov}inset:0"></div>`;
-  } else if (rect) {
+  } else {
     const t = Math.max(0, rect.top - PAD);
     const b = Math.min(appH, rect.bottom + PAD);
     const l = Math.max(0, rect.left - PAD);
@@ -118,7 +138,7 @@ function renderTour() {
   ).join('');
 
   let cardWrap, cardInner;
-  if (cardAt === 'center') {
+  if (cardAt === 'center' || !rect) {
     cardWrap  = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:none';
     cardInner = 'background:#fff;border-radius:22px;padding:26px 24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.28);pointer-events:auto;animation:sk-pop 0.25s ease';
   } else if (cardAt === 'bottom') {
@@ -129,11 +149,12 @@ function renderTour() {
     cardInner = 'background:#fff;border-radius:0 0 24px 24px;padding:52px 20px 24px;pointer-events:auto;animation:sk-tour-top 0.28s cubic-bezier(0.32,0.72,0,1)';
   }
 
+  const counter = `<span style="font-size:13px;color:rgba(60,60,67,0.4);font-weight:600">${currentStep + 1} / ${STEPS.length}</span>`;
   const skipBtn = isLast
-    ? '<span></span>'
-    : `<span id="sk-tour-skip" style="font-size:15px;color:rgba(60,60,67,0.4);cursor:pointer;padding:8px 4px">Пропустить</span>`;
+    ? counter
+    : `<span id="sk-tour-skip" style="font-size:15px;color:rgba(60,60,67,0.45);cursor:pointer;padding:8px 4px">Пропустить</span>`;
 
-  const nextBtn = `<div id="sk-tour-next" style="height:46px;padding:0 26px;background:#0a84ff;border-radius:14px;color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;cursor:pointer">${isLast ? 'Начать' : 'Далее'}</div>`;
+  const nextBtn = `<div id="sk-tour-next" style="height:46px;padding:0 26px;background:#0a84ff;border-radius:14px;color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;cursor:pointer">${isLast ? 'Готово' : 'Далее'}</div>`;
 
   const card = `
     <div style="${cardWrap}">
@@ -162,10 +183,10 @@ function renderTour() {
     if (currentStep >= STEPS.length) { finishTour(); return; }
 
     if (cur.onBeforeNext) {
-      // null out before navigation so render() inside onBeforeNext doesn't re-attach old overlay
+      // null out before navigation so render() inside onBeforeNext doesn't re-attach the old overlay
       tourEl = null;
       cur.onBeforeNext();
-      // app has re-rendered with new screen DOM; now draw next step on top
+      // app has re-rendered with the new screen DOM; now draw the next step on top
     }
 
     renderTour();
@@ -182,10 +203,19 @@ function finishTour() {
 
 export function getTourNode() { return tourEl; }
 
+// Auto-show once on first launch; always stores refs so the «?» button works later.
 export function initTour(appEl, fns = {}) {
-  if (isDone()) return;
   _appEl = appEl;
   _fns = fns;
+  if (isDone()) return;
+  currentStep = 0;
+  renderTour();
+}
+
+// Re-launch from the «?» header button (ignores the "seen once" flag).
+export function startTour() {
+  if (!_appEl) return;
+  if (_fns.goList) _fns.goList();
   currentStep = 0;
   renderTour();
 }

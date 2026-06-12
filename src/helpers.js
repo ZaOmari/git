@@ -14,6 +14,20 @@ export const total = (h) => {
 export const unpaid = (h) =>
   h.expenses.filter((e) => !e.paid).reduce((s, e) => s + e.amount, 0);
 
+// Сколько ещё должны бригадам по объекту (сумма остатков договорено − выплачено).
+export const crewRemain = (h) =>
+  h.crews.reduce((s, c) => {
+    const paid = c.payouts.reduce((a, x) => a + x.a, 0);
+    return s + Math.max(c.agreed - paid, 0);
+  }, 0);
+
+// Всего к оплате по объекту: поставщикам (к оплате) + остаток по бригадам.
+export const obligations = (h) => unpaid(h) + crewRemain(h);
+export const totalObligations = (homes) => homes.reduce((s, h) => s + obligations(h), 0);
+
+// Маржа дома на продажу: цена продажи − себестоимость (null, если цены нет).
+export const margin = (h) => (h.type === 'spec' && h.price ? h.price - total(h) : null);
+
 export const catStyle = (cat) => {
   const c = CAT_COLOR[cat] || CAT_COLOR['Прочее'];
   return `font-size:11px;font-weight:600;padding:2px 8px;border-radius:7px;background:${c[0]};color:${c[1]}`;

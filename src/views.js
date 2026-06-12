@@ -2,7 +2,7 @@
 // СтройКонтроль design. Interactivity is wired through data-action / data-input
 // attributes (see app.js for the delegated handlers).
 import { STAGES, CATS, CAT_COLOR } from './data.js';
-import { fmt, fmtShort, total, unpaid, catStyle, badge, barColor, esc } from './helpers.js';
+import { fmt, fmtShort, total, unpaid, crewRemain, totalObligations, margin, catStyle, badge, barColor, esc } from './helpers.js';
 
 const avatar = (letter, bg, size = 28, ml = 0, border = true) =>
   `<span style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:#fff;font-size:${size === 28 ? 13 : 12}px;font-weight:600;display:flex;align-items:center;justify-content:center;${border ? 'border:2px solid #f2f2f7;' : ''}${ml ? `margin-left:${ml}px;` : ''}">${letter}</span>`;
@@ -15,6 +15,10 @@ const objectAvatars = () =>
   `<span style="width:26px;height:26px;border-radius:50%;background:#0a84ff;color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">Т</span>` +
   `<span style="width:26px;height:26px;border-radius:50%;background:#ff9500;color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">Г</span></div>`;
 
+// «?» — перезапуск демо-тура из шапки
+const tourBtn = () =>
+  `<div data-action="startTour" title="Тур" style="width:28px;height:28px;border-radius:50%;background:rgba(118,118,128,0.14);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;color:#0a84ff;flex-shrink:0">?</div>`;
+
 const backChevron = (label, action) =>
   `<div data-action="${action}" style="display:flex;align-items:center;gap:2px;cursor:pointer;color:#0a84ff;margin-left:-4px">
      <svg width="11" height="18" viewBox="0 0 11 18" fill="none"><path d="M9 2L2 9l7 7" stroke="#0a84ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -25,8 +29,7 @@ const backChevron = (label, action) =>
 export function listScreen(state) {
   const homes = state.homes;
   const allTotal = homes.reduce((s, h) => s + total(h), 0);
-  const allUnpaid = homes.reduce((s, h) => s + unpaid(h), 0);
-  const summarySub = `${homes.length} объекта · к оплате поставщикам ${fmt(allUnpaid)}`;
+  const allOblig = totalObligations(homes);
 
   const cards = homes.map((h, _hi) => {
     const tot = total(h);
@@ -34,14 +37,19 @@ export function listScreen(state) {
     const hasPrice = h.type === 'contract' && h.price;
     const pct = hasPrice ? Math.round((tot / h.price) * 100) : null;
     const col = pct != null ? barColor(pct) : '#0a84ff';
-    const isSpec = h.type === 'spec';
-    const priceLine = hasPrice ? 'из ' + fmt(h.price) : 'Цена продажи не задана';
     const unpaidLabel = up > 0 ? 'к оплате ' + fmt(up) : null;
 
-    const rightCol = hasPrice
-      ? `<div style="font-size:13px;font-weight:600;color:${col}">${pct}%</div>
-         <div style="font-size:12px;color:rgba(60,60,67,0.5);margin-top:1px">${esc(priceLine)}</div>`
-      : `<div style="font-size:12px;color:rgba(60,60,67,0.5);max-width:120px">${esc(priceLine)}</div>`;
+    let rightCol;
+    if (hasPrice) {
+      rightCol = `<div style="font-size:13px;font-weight:600;color:${col}">${pct}%</div>
+         <div style="font-size:12px;color:rgba(60,60,67,0.5);margin-top:1px">из ${fmt(h.price)}</div>`;
+    } else if (h.type === 'spec' && h.price) {
+      const m = margin(h);
+      rightCol = `<div style="font-size:14px;font-weight:700;color:#248a43">+${fmt(m)}</div>
+         <div style="font-size:12px;color:rgba(60,60,67,0.5);margin-top:1px">маржа · цена ${fmtShort(h.price)}</div>`;
+    } else {
+      rightCol = `<div style="font-size:12px;color:rgba(60,60,67,0.5);max-width:120px">Цена продажи не задана</div>`;
+    }
 
     const progress = hasPrice
       ? `<div style="margin-top:10px;height:6px;border-radius:3px;background:#e9e9ee;overflow:hidden">
@@ -82,6 +90,7 @@ export function listScreen(state) {
       <div style="padding:56px 20px 6px;display:flex;align-items:flex-end;justify-content:space-between">
         <div style="font-size:34px;font-weight:700;letter-spacing:-0.6px;color:#1c1c1e">Объекты</div>
         <div style="display:flex;align-items:center;gap:8px;padding-bottom:6px">
+          ${tourBtn()}
           <div style="display:flex;align-items:center;gap:5px;background:rgba(52,199,89,0.12);padding:4px 9px 4px 7px;border-radius:999px">
             <span style="width:7px;height:7px;border-radius:50%;background:#34c759;box-shadow:0 0 0 2px rgba(52,199,89,0.25)"></span>
             <span style="font-size:12px;font-weight:600;color:#248a43;letter-spacing:-0.1px">Синхр.</span>
@@ -89,10 +98,15 @@ export function listScreen(state) {
           ${headerAvatars()}
         </div>
       </div>
-      <div id="sk-tour-summary" style="margin:14px 16px 8px;background:#1c1c1e;border-radius:22px;padding:18px 20px;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.16)">
+      <div id="sk-tour-summary" style="margin:14px 16px 8px;background:#1c1c1e;border-radius:22px;padding:18px 20px 16px;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.16)">
         <div style="font-size:13px;font-weight:500;color:rgba(235,235,245,0.6);letter-spacing:-0.1px">Себестоимость всех объектов</div>
         <div style="font-size:36px;font-weight:700;letter-spacing:-1px;margin-top:3px;line-height:1.05">${fmt(allTotal)}</div>
-        <div style="font-size:13px;color:rgba(235,235,245,0.55);margin-top:6px">${esc(summarySub)}</div>
+        <div style="font-size:12px;color:rgba(235,235,245,0.45);margin-top:5px">обновлено только что</div>
+        <div style="height:0.5px;background:rgba(235,235,245,0.14);margin:13px 0 11px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:14px;color:rgba(235,235,245,0.7)">Всего к оплате</span>
+          <span style="font-size:18px;font-weight:700;letter-spacing:-0.3px;color:#ffb340">${fmt(allOblig)}</span>
+        </div>
       </div>
       <div style="font-size:13px;color:rgba(60,60,67,0.6);padding:14px 24px 8px;letter-spacing:-0.08px">ОБЪЕКТЫ · ${homes.length}</div>
       ${cards}
@@ -110,10 +124,10 @@ export function objectScreen(state) {
   const pct = hasPrice ? Math.round((tot / h.price) * 100) : null;
   const col = pct != null ? barColor(pct) : '#0a84ff';
 
-  // hero: price progress + warning OR spec note
+  // hero: price progress + warning OR spec margin
   let heroExtra = '';
   if (hasPrice) {
-    const warnLabel = pct >= 85 ? 'Себестоимость близко к стоимости по договору' : null;
+    const warnLabel = pct >= 85 ? 'Бюджет на исходе: себестоимость близко к стоимости по договору' : null;
     heroExtra = `
       <div style="margin-top:15px;display:flex;align-items:center;justify-content:space-between">
         <span style="font-size:13px;color:rgba(60,60,67,0.6)">Стоимость по договору ${fmt(h.price)}</span>
@@ -123,19 +137,30 @@ export function objectScreen(state) {
         <div style="height:100%;border-radius:4px;width:${Math.min(pct, 100)}%;background:${col}"></div>
       </div>
       ${warnLabel ? `
-      <div style="margin-top:11px;display:flex;align-items:center;gap:8px;background:rgba(255,149,0,0.1);border-radius:12px;padding:9px 11px">
+      <div id="sk-tour-warn" style="margin-top:11px;display:flex;align-items:center;gap:8px;background:rgba(255,149,0,0.1);border-radius:12px;padding:9px 11px">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2L1 21h22L12 2z" fill="#ff9500"/><rect x="11" y="9" width="2" height="6" rx="1" fill="#fff"/><circle cx="12" cy="18" r="1.2" fill="#fff"/></svg>
         <span style="font-size:13px;color:#9a5b00;font-weight:500;line-height:1.3">${warnLabel}</span>
       </div>` : ''}`;
+  } else if (h.type === 'spec' && h.price) {
+    const m = margin(h);
+    heroExtra = `
+      <div style="margin-top:15px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:13px;color:rgba(60,60,67,0.6)">Цена продажи ${fmt(h.price)}</span>
+        <span style="font-size:12px;font-weight:600;padding:3px 9px;border-radius:7px;background:rgba(255,149,0,0.14);color:#b56b00">На продажу</span>
+      </div>
+      <div style="margin-top:11px;background:rgba(52,199,89,0.1);border-radius:12px;padding:11px 13px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:14px;color:#1c1c1e;font-weight:500">Маржа</span>
+        <span style="font-size:20px;font-weight:700;letter-spacing:-0.4px;color:#248a43">+${fmt(m)}</span>
+      </div>`;
   } else if (h.type === 'spec') {
-    heroExtra = `<div style="margin-top:14px;font-size:13px;color:rgba(60,60,67,0.6);line-height:1.4">Объект на продажу — клиента нет. Цена и маржа задаются позже, во вкладке «Продажа».</div>`;
+    heroExtra = `<div style="margin-top:14px;font-size:13px;color:rgba(60,60,67,0.6);line-height:1.4">Объект на продажу — клиента нет. Цена и маржа задаются во вкладке «Продажа».</div>`;
   }
 
-  // segmented tabs
+  // segmented tabs (+ Заметки)
   const tabs = isContract
-    ? [['expenses', 'Расходы'], ['crews', 'Бригады'], ['stages', 'Этапы'], ['client', 'Оплаты']]
-    : [['expenses', 'Расходы'], ['crews', 'Бригады'], ['stages', 'Этапы'], ['sale', 'Продажа']];
-  const segBase = 'flex:1;text-align:center;padding:7px 4px;border-radius:7px;font-size:13px;letter-spacing:-0.1px;cursor:pointer;';
+    ? [['expenses', 'Расходы'], ['crews', 'Бригады'], ['stages', 'Этапы'], ['notes', 'Заметки'], ['client', 'Оплаты']]
+    : [['expenses', 'Расходы'], ['crews', 'Бригады'], ['stages', 'Этапы'], ['notes', 'Заметки'], ['sale', 'Продажа']];
+  const segBase = 'flex:1;text-align:center;padding:7px 3px;border-radius:7px;font-size:12.5px;letter-spacing:-0.2px;cursor:pointer;';
   const segs = tabs.map(([k, l]) => {
     const active = state.tab === k;
     const style = active
@@ -150,7 +175,10 @@ export function objectScreen(state) {
     <div style="padding-bottom:120px">
       <div style="padding:54px 16px 0;display:flex;align-items:center;justify-content:space-between">
         ${backChevron('Объекты', 'back')}
-        ${objectAvatars()}
+        <div style="display:flex;align-items:center;gap:8px">
+          ${tourBtn()}
+          ${objectAvatars()}
+        </div>
       </div>
       <div style="padding:14px 20px 4px">
         <div style="display:flex;align-items:center;gap:8px">
@@ -161,7 +189,7 @@ export function objectScreen(state) {
           <span style="font-size:13px;color:rgba(60,60,67,0.6)">${esc(h.address)}</span>
         </div>
       </div>
-      <div style="margin:12px 16px 0;background:#fff;border-radius:22px;padding:18px 20px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+      <div id="sk-tour-cost" style="margin:12px 16px 0;background:#fff;border-radius:22px;padding:18px 20px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
         <div style="font-size:13px;font-weight:500;color:rgba(60,60,67,0.6)">Себестоимость</div>
         <div style="font-size:38px;font-weight:700;letter-spacing:-1.2px;color:#1c1c1e;line-height:1.02;margin-top:2px">${fmt(tot)}</div>
         ${up > 0 ? `<div style="font-size:13px;color:#c2410c;font-weight:500;margin-top:4px">из них к оплате поставщикам ${fmt(up)}</div>` : ''}
@@ -176,6 +204,7 @@ function objectTab(state, h) {
   const tab = state.tab;
 
   if (tab === 'expenses') {
+    let splitTagged = false;
     const rows = h.expenses.map((e, i) => {
       const last = i === h.expenses.length - 1;
       const paidStyle = e.paid
@@ -187,8 +216,10 @@ function objectTab(state, h) {
         `<span style="font-size:12px;color:rgba(60,60,67,0.5)">${esc(meta)}</span>` +
         (e.photo ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="15" rx="3" stroke="rgba(60,60,67,0.45)" stroke-width="2"/><circle cx="12" cy="13" r="3.5" stroke="rgba(60,60,67,0.45)" stroke-width="2"/><path d="M8 6l1.5-2.5h5L16 6" stroke="rgba(60,60,67,0.45)" stroke-width="2" stroke-linejoin="round"/></svg>` : '') +
         (e.split ? `<span style="font-size:11px;color:#5856d6;font-weight:600;background:rgba(88,86,214,0.1);padding:2px 6px;border-radius:6px">делёж</span>` : '');
+      // первая запись с делением — якорь тура
+      const anchor = (e.split && !splitTagged) ? (splitTagged = true, ' id="sk-tour-split"') : '';
       return `
-        <div style="padding:13px 16px;${last ? '' : 'border-bottom:0.5px solid rgba(60,60,67,0.08)'}">
+        <div${anchor} style="padding:13px 16px;${last ? '' : 'border-bottom:0.5px solid rgba(60,60,67,0.08)'}">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
             <div style="min-width:0;flex:1">
               <div style="font-size:15px;color:#1c1c1e;line-height:1.3;font-weight:450">${esc(e.text)}</div>
@@ -205,6 +236,7 @@ function objectTab(state, h) {
   }
 
   if (tab === 'crews') {
+    let remainTagged = false;
     const cards = h.crews.map((c) => {
       const paid = c.payouts.reduce((s, x) => s + x.a, 0);
       const remain = c.agreed - paid;
@@ -214,8 +246,9 @@ function objectTab(state, h) {
       const payoutChips = c.payouts.map((p) =>
         `<span style="font-size:13px;color:#1c1c1e;background:#f2f2f7;border-radius:9px;padding:5px 10px;font-weight:500">${esc(p.d + ' — ' + fmtShort(p.a) + ' ₽')}</span>`
       ).join('');
+      const anchor = (remain > 0 && !remainTagged) ? (remainTagged = true, ' id="sk-tour-remain"') : '';
       return `
-        <div style="background:#fff;border-radius:18px;padding:15px 16px;margin-bottom:11px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+        <div${anchor} style="background:#fff;border-radius:18px;padding:15px 16px;margin-bottom:11px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
             <div style="font-size:16px;font-weight:600;color:#1c1c1e;line-height:1.25">${esc(c.work)}</div>
             <span style="${remainStyle}">${remain > 0 ? 'остаток ' + fmt(remain) : 'закрыто'}</span>
@@ -244,7 +277,7 @@ function objectTab(state, h) {
       const connector = i < STAGES.length - 1
         ? `<span style="width:2px;height:22px;background:${lineColor};margin-top:3px"></span>` : '';
       const actBtn = current
-        ? `<div data-action="openAct" style="display:inline-flex;align-items:center;gap:6px;margin-top:9px;background:#0a84ff;color:#fff;font-size:14px;font-weight:600;padding:8px 14px;border-radius:11px;cursor:pointer">
+        ? `<div id="sk-tour-act" data-action="openAct" style="display:inline-flex;align-items:center;gap:6px;margin-top:9px;background:#0a84ff;color:#fff;font-size:14px;font-weight:600;padding:8px 14px;border-radius:11px;cursor:pointer">
              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 3h10l4 4v14H5V3z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M14 3v5h5M8 13h8M8 17h5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
              Сформировать акт
            </div>` : '';
@@ -261,6 +294,34 @@ function objectTab(state, h) {
         </div>`;
     }).join('');
     return `<div style="margin:14px 16px 0;background:#fff;border-radius:18px;padding:6px 18px 14px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">${rows}</div>`;
+  }
+
+  if (tab === 'notes') {
+    const notes = h.notes || [];
+    const list = notes.length
+      ? notes.map((n, idx) => {
+          const last = idx === notes.length - 1;
+          const photoTag = n.photo
+            ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:rgba(60,60,67,0.5);margin-top:6px">
+                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="15" rx="3" stroke="rgba(60,60,67,0.45)" stroke-width="2"/><circle cx="12" cy="13" r="3.5" stroke="rgba(60,60,67,0.45)" stroke-width="2"/><path d="M8 6l1.5-2.5h5L16 6" stroke="rgba(60,60,67,0.45)" stroke-width="2" stroke-linejoin="round"/></svg>
+                 фото
+               </span>` : '';
+          return `
+            <div style="padding:13px 16px;${last ? '' : 'border-bottom:0.5px solid rgba(60,60,67,0.08)'}">
+              <div style="font-size:15px;color:#1c1c1e;line-height:1.35">${esc(n.text)}</div>
+              <div style="font-size:12px;color:rgba(60,60,67,0.5);margin-top:4px">${esc(n.date)} · ${n.photo ? 'с фото' : 'заметка'}</div>
+              ${photoTag}
+            </div>`;
+        }).join('')
+      : `<div style="padding:22px 16px;text-align:center;font-size:14px;color:rgba(60,60,67,0.45)">Пока нет заметок. Коды, договорённости — сюда.</div>`;
+    return `
+      <div id="sk-tour-notes" style="margin:14px 16px 0">
+        <div style="background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04)">${list}</div>
+        <div data-action="openNote" style="margin-top:11px;height:48px;background:#fff;border-radius:15px;display:flex;align-items:center;justify-content:center;gap:7px;color:#0a84ff;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#0a84ff" stroke-width="2.4" stroke-linecap="round"/></svg>
+          Заметка
+        </div>
+      </div>`;
   }
 
   if (tab === 'client') {
@@ -302,6 +363,7 @@ function objectTab(state, h) {
   }
 
   if (tab === 'sale') {
+    const m = margin(h);
     return `
       <div style="margin:14px 16px 0;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:0.5px solid rgba(60,60,67,0.1)">
@@ -310,14 +372,16 @@ function objectTab(state, h) {
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:0.5px solid rgba(60,60,67,0.1)">
           <span style="font-size:15px;color:#1c1c1e">Цена продажи</span>
-          <span style="font-size:15px;color:#0a84ff;font-weight:500">задать</span>
+          <span style="font-size:16px;font-weight:600;color:#1c1c1e">${h.price ? fmt(h.price) : '<span style="color:#0a84ff;font-weight:500">задать</span>'}</span>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px">
           <span style="font-size:15px;color:#1c1c1e">Маржа</span>
-          <span style="font-size:16px;color:rgba(60,60,67,0.4)">— цена не задана</span>
+          ${m != null
+            ? `<span style="font-size:18px;font-weight:700;color:#248a43">+${fmt(m)}</span>`
+            : `<span style="font-size:16px;color:rgba(60,60,67,0.4)">— цена не задана</span>`}
         </div>
       </div>
-      <div style="margin:12px 24px 0;font-size:13px;color:rgba(60,60,67,0.5);line-height:1.45">Маржа посчитается автоматически: цена продажи − себестоимость.</div>`;
+      <div style="margin:12px 24px 0;font-size:13px;color:rgba(60,60,67,0.5);line-height:1.45">Маржа = цена продажи − себестоимость. Считается автоматически.</div>`;
   }
   return '';
 }
@@ -432,7 +496,7 @@ export function sheet(state, animate = false) {
             <span style="font-size:30px;font-weight:600;color:rgba(60,60,67,0.4)">₽</span>
           </div>
         </div>
-        <div style="margin:12px 16px 0;background:#fff;border-radius:18px;padding:14px 18px">
+        <div id="sk-tour-desc" style="margin:12px 16px 0;background:#fff;border-radius:18px;padding:14px 18px">
           <textarea data-input="text" rows="2" placeholder="бетон, 26 кубов, доставка…" style="width:100%;border:none;outline:none;resize:none;font-size:16px;color:#1c1c1e;background:transparent;font-family:inherit;line-height:1.4">${esc(d.text)}</textarea>
           <div style="font-size:12px;color:rgba(60,60,67,0.45);margin-top:2px">Пишите как удобно — категория необязательна</div>
         </div>
@@ -455,6 +519,42 @@ export function sheet(state, animate = false) {
         <div style="padding:18px 16px 0">
           <div data-action="saveExpense" style="height:52px;background:#0a84ff;border-radius:15px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;font-weight:600;cursor:pointer">Сохранить расход</div>
           <div style="text-align:center;font-size:12px;color:rgba(60,60,67,0.5);margin-top:8px">Сразу увидит Таня · сохраняется офлайн</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ░░░░░ ЛИСТ: НОВАЯ ЗАМЕТКА ░░░░░
+export function noteSheet(state, animate = false) {
+  if (state.sheet !== 'note') return '';
+  const d = state.noteDraft;
+  const dimAnim = animate ? 'animation:sk-fade 0.25s ease' : '';
+  const sheetAnim = animate ? 'animation:sk-sheet 0.32s cubic-bezier(0.32,0.72,0,1)' : '';
+  const photoLabel = d.photo ? 'прикреплено ✓' : 'добавить';
+  const photoLabelStyle = d.photo ? 'font-size:15px;color:#248a43;font-weight:500' : 'font-size:15px;color:#0a84ff';
+
+  return `
+    <div style="position:absolute;inset:0;z-index:40">
+      <div data-action="closeSheet" style="position:absolute;inset:0;background:rgba(0,0,0,0.32);${dimAnim}"></div>
+      <div style="position:absolute;left:0;right:0;bottom:0;background:#f2f2f7;border-radius:26px 26px 0 0;padding:8px 0 30px;${sheetAnim};max-height:94%;overflow-y:auto;box-shadow:0 -8px 30px rgba(0,0,0,0.18)">
+        <div style="width:38px;height:5px;border-radius:3px;background:rgba(60,60,67,0.25);margin:0 auto 6px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 18px 12px">
+          <span data-action="closeSheet" style="font-size:17px;color:#0a84ff;cursor:pointer">Отмена</span>
+          <span style="font-size:17px;font-weight:600;color:#1c1c1e">Новая заметка</span>
+          <span style="font-size:17px;color:rgba(60,60,67,0.3);width:54px;text-align:right">·</span>
+        </div>
+        <div style="margin:0 16px;background:#fff;border-radius:18px;padding:14px 18px">
+          <textarea data-input="note-text" rows="3" placeholder="код от ворот, договорённость, что не забыть…" style="width:100%;border:none;outline:none;resize:none;font-size:16px;color:#1c1c1e;background:transparent;font-family:inherit;line-height:1.4">${esc(d.text)}</textarea>
+        </div>
+        <div style="margin:14px 16px 0;background:#fff;border-radius:18px;overflow:hidden">
+          <div data-action="toggleNotePhoto" style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;cursor:pointer">
+            <span style="font-size:16px;color:#1c1c1e">Фото</span>
+            <span style="${photoLabelStyle}">${photoLabel}</span>
+          </div>
+        </div>
+        <div style="padding:18px 16px 0">
+          <div data-action="saveNote" style="height:52px;background:#0a84ff;border-radius:15px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;font-weight:600;cursor:pointer">Сохранить заметку</div>
+          <div style="text-align:center;font-size:12px;color:rgba(60,60,67,0.5);margin-top:8px">Привязана к объекту · видит Таня</div>
         </div>
       </div>
     </div>`;
