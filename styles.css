@@ -1,9 +1,62 @@
 /* ── base reset ── */
 html, body { margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; font-size: 100%; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body {
   font-family: -apple-system, "SF Pro Display", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  background: var(--bg);
+}
+
+/* ─────────────────────────────────────────────
+   Design tokens — colour themes + font-size unit
+   --sk-u: rem-based "1px at default" unit, multiplied by the manual A/A/A step
+           (--sk-fs). Inline styles use calc(N*var(--sk-u)) for font sizes, so
+           the whole UI honours iOS Dynamic Type AND the in-app size control.
+   --label: rgb channels for iOS "label" colour, used as rgba(var(--label),α).
+   ───────────────────────────────────────────── */
+:root, :root[data-theme="light"] {
+  --sk-fs: 1;
+  --sk-u: calc(1rem / 16 * var(--sk-fs));
+  --stage: radial-gradient(120% 100% at 50% 0%, #f0f0f4 0%, #e4e4ea 100%);
+  --bg: #f2f2f7;
+  --card: #ffffff;
+  --card2: #fbfbfd;
+  --text: #1c1c1e;
+  --label: 60, 60, 67;
+  --track: #e9e9ee;
+  --seg: rgba(118, 118, 128, 0.12);
+  --invert: #1c1c1e;          /* dark feature cards (сводка, тост) */
+  --hairline: rgba(60, 60, 67, 0.1);
+}
+
+/* dark palette — applied automatically (Авто) when system is dark… */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --stage: radial-gradient(120% 100% at 50% 0%, #1c1c1e 0%, #000000 100%);
+    --bg: #000000;
+    --card: #1c1c1e;
+    --card2: #161618;
+    --text: #ffffff;
+    --label: 235, 235, 245;
+    --track: #3a3a3c;
+    --seg: rgba(118, 118, 128, 0.30);
+    --invert: #2c2c2e;
+    --hairline: rgba(235, 235, 245, 0.16);
+  }
+}
+/* …or forced via the manual switch (Тёмная) */
+:root[data-theme="dark"] {
+  --stage: radial-gradient(120% 100% at 50% 0%, #1c1c1e 0%, #000000 100%);
+  --bg: #000000;
+  --card: #1c1c1e;
+  --card2: #161618;
+  --text: #ffffff;
+  --label: 235, 235, 245;
+  --track: #3a3a3c;
+  --seg: rgba(118, 118, 128, 0.30);
+  --invert: #2c2c2e;
+  --hairline: rgba(235, 235, 245, 0.16);
 }
 
 /* ── animations (ported from the design) ── */
@@ -13,14 +66,14 @@ body {
 @keyframes sk-pop      { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes sk-tour-top { from { transform: translateY(-100%); } to { transform: translateY(0); } }
 
-/* ── stage: gray radial backdrop, centered frame ── */
+/* ── stage: themed backdrop, centered frame ── */
 .sk-stage {
   min-height: 100vh;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(120% 100% at 50% 0%, #f0f0f4 0%, #e4e4ea 100%);
+  background: var(--stage);
   padding: 28px;
 }
 
@@ -31,8 +84,8 @@ body {
   border-radius: 12px;
   overflow: hidden;
   position: relative;
-  background: #f2f2f7;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.08);
+  background: var(--bg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.10);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
@@ -44,7 +97,8 @@ body {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  background: #f2f2f7;
+  background: var(--bg);
+  color: var(--text);
   overflow: hidden;
 }
 .sk-scroll {

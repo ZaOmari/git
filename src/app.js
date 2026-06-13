@@ -3,8 +3,24 @@
 // interactions through delegated events. The signature canvas is managed
 // imperatively so an in-progress drawing survives state changes.
 import { seedHomes, STAGES } from './data.js';
-import { listScreen, objectScreen, actScreen, fab, sheet, noteSheet, toast } from './views.js';
+import { listScreen, objectScreen, actScreen, fab, sheet, noteSheet, settingsSheet, toast } from './views.js';
 import { initTour, getTourNode, startTour } from './tour.js';
+
+// ── accessibility prefs (тема + размер шрифта), сохраняются в localStorage ──
+const FONT_STEPS = { normal: '1', large: '1.18', xlarge: '1.4' };
+function loadPref(key, fallback) {
+  try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+}
+function applyTheme(theme) {
+  // 'auto' → снять атрибут (работает @media prefers-color-scheme); иначе зафиксировать
+  if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+  else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem('sk-theme', theme); } catch {}
+}
+function applyFont(scaleKey) {
+  document.documentElement.style.setProperty('--sk-fs', FONT_STEPS[scaleKey] || '1');
+  try { localStorage.setItem('sk-fs', scaleKey); } catch {}
+}
 
 const state = {
   screen: 'list',          // 'list' | 'object' | 'act'
@@ -17,13 +33,20 @@ const state = {
   act: { client: '', object: '', works: '', sum: '' },
   draft: { text: '', amount: '', category: null, homeId: null, paid: true, split: false, photo: false },
   noteDraft: { text: '', photo: false, homeId: null },
+  theme: loadPref('sk-theme', 'auto'),       // 'auto' | 'light' | 'dark'
+  fontScale: loadPref('sk-fs', 'normal'),    // 'normal' | 'large' | 'xlarge'
   homes: seedHomes(),
 };
+
+// применить сохранённые настройки до первого рендера (без вспышки)
+applyTheme(state.theme);
+applyFont(state.fontScale);
 
 // ── transition tracking, so animations play once per appearance ──
 let prevScreen = null;
 let prevSheetOpen = false;
 let prevNoteOpen = false;
+let prevSettingsOpen = false;
 let prevFabShown = false;
 let prevToastShown = false;
 let toastTimer = null;
@@ -47,13 +70,15 @@ function render() {
   const fx = {
     sheet: state.sheet === 'expense' && !prevSheetOpen,
     note: state.sheet === 'note' && !prevNoteOpen,
+    settings: state.sheet === 'settings' && !prevSettingsOpen,
     fab: fabShown() && !prevFabShown,
     toast: !!state.toast && !prevToastShown,
   };
 
   app.innerHTML =
     `<div class="sk-scroll" id="sk-scroll">${screenHtml}</div>` +
-    fab(state, fx.fab) + sheet(state, fx.sheet) + noteSheet(state, fx.note) + toast(state, fx.toast);
+    fab(state, fx.fab) + sheet(state, fx.sheet) + noteSheet(state, fx.note) +
+    settingsSheet(state, fx.settings) + toast(state, fx.toast);
 
   scrollEl = document.getElementById('sk-scroll');
   if (scrollEl) scrollEl.scrollTop = prevScreen === state.screen ? prevTop : 0;
@@ -67,6 +92,7 @@ function render() {
   prevScreen = state.screen;
   prevSheetOpen = state.sheet === 'expense';
   prevNoteOpen = state.sheet === 'note';
+  prevSettingsOpen = state.sheet === 'settings';
   prevFabShown = fabShown();
   prevToastShown = !!state.toast;
 }
@@ -96,7 +122,8 @@ function wireSignature() {
       canvas.width = tW; canvas.height = tH;
       ctx = canvas.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1c1c1e';
+      const ink = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#1c1c1e';
+      ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = ink;
     }
     if (!ctx) ctx = canvas.getContext('2d');
     return ctx;
@@ -217,6 +244,9 @@ const actions = {
   clearSig: () => { if (sigCanvas) { const cx = sigCanvas.getContext('2d'); cx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); } state.signed = false; render(); },
   addPayout: () => showToast('Скоро: добавление выплаты'),
   startTour: () => startTour(),
+  openSettings: () => { state.sheet = 'settings'; render(); },
+  setTheme: (el) => { state.theme = el.dataset.theme; applyTheme(state.theme); render(); },
+  setFontScale: (el) => { state.fontScale = el.dataset.scale; applyFont(state.fontScale); render(); },
 };
 
 // ── click delegation ──

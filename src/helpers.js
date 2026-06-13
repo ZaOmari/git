@@ -37,13 +37,13 @@ export const otherNotesCount = (h) => { const ns = h.notes || []; return ns.leng
 
 export const catStyle = (cat) => {
   const c = CAT_COLOR[cat] || CAT_COLOR['Прочее'];
-  return `font-size:11px;font-weight:600;padding:2px 8px;border-radius:7px;background:${c[0]};color:${c[1]}`;
+  return `font-size:calc(11*var(--sk-u));font-weight:600;padding:2px 8px;border-radius:7px;background:${c[0]};color:${c[1]}`;
 };
 
 export const badge = (type) =>
   type === 'contract'
-    ? 'font-size:11px;font-weight:600;padding:3px 9px;border-radius:7px;background:rgba(10,132,255,0.12);color:#0a6fd6;white-space:nowrap;flex-shrink:0'
-    : 'font-size:11px;font-weight:600;padding:3px 9px;border-radius:7px;background:rgba(255,149,0,0.14);color:#b56b00;white-space:nowrap;flex-shrink:0';
+    ? 'font-size:calc(11*var(--sk-u));font-weight:600;padding:3px 9px;border-radius:7px;background:rgba(10,132,255,0.12);color:#0a6fd6;white-space:nowrap;flex-shrink:0'
+    : 'font-size:calc(11*var(--sk-u));font-weight:600;padding:3px 9px;border-radius:7px;background:rgba(255,149,0,0.14);color:#b56b00;white-space:nowrap;flex-shrink:0';
 
 // progress/over-budget color: red >=100%, amber >=85%, otherwise blue.
 export const barColor = (pct) => (pct >= 100 ? '#ff3b30' : pct >= 85 ? '#ff9500' : '#0a84ff');

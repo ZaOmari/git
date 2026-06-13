@@ -133,34 +133,34 @@ function renderTour() {
   }
 
   const dots = STEPS.map((_, i) =>
-    `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${i === currentStep ? '#0a84ff' : 'rgba(60,60,67,0.18)'}"></span>`
+    `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${i === currentStep ? '#0a84ff' : 'rgba(var(--label),0.18)'}"></span>`
   ).join('');
 
   let cardWrap, cardInner;
   if (cardAt === 'center' || !rect) {
     cardWrap  = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:none';
-    cardInner = 'background:#fff;border-radius:22px;padding:26px 24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.28);pointer-events:auto;animation:sk-pop 0.25s ease';
+    cardInner = 'background:var(--card);border-radius:22px;padding:26px 24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.28);pointer-events:auto;animation:sk-pop 0.25s ease';
   } else if (cardAt === 'bottom') {
     cardWrap  = 'position:absolute;left:0;right:0;bottom:0;pointer-events:none';
-    cardInner = 'background:#fff;border-radius:24px 24px 0 0;padding:20px 20px 40px;pointer-events:auto;animation:sk-sheet 0.28s cubic-bezier(0.32,0.72,0,1)';
+    cardInner = 'background:var(--card);border-radius:24px 24px 0 0;padding:20px 20px 40px;pointer-events:auto;animation:sk-sheet 0.28s cubic-bezier(0.32,0.72,0,1)';
   } else {
     cardWrap  = 'position:absolute;left:0;right:0;top:0;pointer-events:none';
-    cardInner = 'background:#fff;border-radius:0 0 24px 24px;padding:52px 20px 24px;pointer-events:auto;animation:sk-tour-top 0.28s cubic-bezier(0.32,0.72,0,1)';
+    cardInner = 'background:var(--card);border-radius:0 0 24px 24px;padding:52px 20px 24px;pointer-events:auto;animation:sk-tour-top 0.28s cubic-bezier(0.32,0.72,0,1)';
   }
 
-  const counter = `<span style="font-size:13px;color:rgba(60,60,67,0.4);font-weight:600">${currentStep + 1} / ${STEPS.length}</span>`;
+  const counter = `<span style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.4);font-weight:600">${currentStep + 1} / ${STEPS.length}</span>`;
   const skipBtn = isLast
     ? counter
-    : `<span id="sk-tour-skip" style="font-size:15px;color:rgba(60,60,67,0.45);cursor:pointer;padding:8px 4px">Пропустить</span>`;
+    : `<span id="sk-tour-skip" style="font-size:calc(15*var(--sk-u));color:rgba(var(--label),0.45);cursor:pointer;padding:8px 4px">Пропустить</span>`;
 
-  const nextBtn = `<div id="sk-tour-next" style="height:46px;padding:0 26px;background:#0a84ff;border-radius:14px;color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;cursor:pointer">${isLast ? 'Готово' : 'Далее'}</div>`;
+  const nextBtn = `<div id="sk-tour-next" style="height:46px;padding:0 26px;background:#0a84ff;border-radius:14px;color:#fff;font-size:calc(15*var(--sk-u));font-weight:600;display:flex;align-items:center;cursor:pointer">${isLast ? 'Готово' : 'Далее'}</div>`;
 
   const card = `
     <div style="${cardWrap}">
       <div style="${cardInner}">
         <div style="display:flex;gap:5px;margin-bottom:14px">${dots}</div>
-        <div style="font-size:20px;font-weight:700;color:#1c1c1e;letter-spacing:-0.3px;line-height:1.2">${s.title}</div>
-        <div style="font-size:15px;color:rgba(60,60,67,0.65);margin-top:7px;line-height:1.5">${s.body}</div>
+        <div style="font-size:calc(20*var(--sk-u));font-weight:700;color:var(--text);letter-spacing:-0.3px;line-height:1.2">${s.title}</div>
+        <div style="font-size:calc(15*var(--sk-u));color:rgba(var(--label),0.65);margin-top:7px;line-height:1.5">${s.body}</div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px">
           ${skipBtn}
           ${nextBtn}
