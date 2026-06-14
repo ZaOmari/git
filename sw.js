@@ -5,7 +5,7 @@
 // (HTML/JS/CSS + navigations) use network-first, so a normal page refresh pulls
 // the new version when online and falls back to cache offline. Static assets
 // (icons, manifest) use cache-first. The page reloads once on controllerchange.
-const APP_VERSION = 'v4-2026-06-14';
+const APP_VERSION = 'v5-2026-06-14';
 const CACHE = `stroykontrol-${APP_VERSION}`;
 
 const SHELL = [

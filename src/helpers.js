@@ -4,10 +4,11 @@ import { CAT_COLOR } from './data.js';
 export const fmt = (n) => Math.round(n).toLocaleString('ru-RU') + ' ₽';
 export const fmtShort = (n) => Math.round(n).toLocaleString('ru-RU');
 
-// Себестоимость = base + all expenses + all crew payouts.
+// Себестоимость = base + all expenses + crew payouts (кроме связанных с расходом).
+// Выплаты, помеченные linked, уже учтены как расход «Работа» — иначе двойной счёт.
 export const total = (h) => {
   const exp = h.expenses.reduce((s, e) => s + e.amount, 0);
-  const crew = h.crews.reduce((s, c) => s + c.payouts.reduce((p, x) => p + x.a, 0), 0);
+  const crew = h.crews.reduce((s, c) => s + c.payouts.reduce((p, x) => p + (x.linked ? 0 : x.a), 0), 0);
   return h.base + exp + crew;
 };
 

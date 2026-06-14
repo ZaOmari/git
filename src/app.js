@@ -4,7 +4,7 @@
 // imperatively so an in-progress drawing survives state changes.
 import { seedHomes, STAGES, CATS, seedCrews, seedRequisites } from './data.js';
 import { total, obligations, fmt } from './helpers.js';
-import { listScreen, objectScreen, actScreen, fab, sheet, noteSheet, settingsScreen, confirmDialog, toast } from './views.js';
+import { listScreen, objectScreen, actScreen, fab, sheet, noteSheet, payoutSheet, settingsScreen, confirmDialog, toast } from './views.js';
 import { initTour, getTourNode, startTour } from './tour.js';
 
 // ── accessibility prefs (тема + размер шрифта), сохраняются в localStorage ──
@@ -34,6 +34,7 @@ const state = {
   act: { client: '', object: '', works: '', sum: '' },
   draft: { text: '', amount: '', category: null, homeId: null, paid: true, split: false, photo: false },
   noteDraft: { text: '', photo: false, homeId: null },
+  payoutDraft: { homeId: null, crewId: null, crew: '', work: '', amount: '', date: '' },
   theme: loadPref('sk-theme', 'auto'),       // 'auto' | 'light' | 'dark'
   fontScale: loadPref('sk-fs', 'normal'),    // 'normal' | 'large' | 'xlarge'
   // ── администрирование (Настройки → Управление) ──
@@ -57,6 +58,7 @@ applyFont(state.fontScale);
 let prevScreen = null;
 let prevSheetOpen = false;
 let prevNoteOpen = false;
+let prevPayoutOpen = false;
 let prevFabShown = false;
 let prevToastShown = false;
 let toastTimer = null;
@@ -81,6 +83,7 @@ function render() {
   const fx = {
     sheet: state.sheet === 'expense' && !prevSheetOpen,
     note: state.sheet === 'note' && !prevNoteOpen,
+    payout: state.sheet === 'payout' && !prevPayoutOpen,
     fab: fabShown() && !prevFabShown,
     toast: !!state.toast && !prevToastShown,
   };
@@ -88,7 +91,7 @@ function render() {
   app.innerHTML =
     `<div class="sk-scroll" id="sk-scroll">${screenHtml}</div>` +
     fab(state, fx.fab) + sheet(state, fx.sheet) + noteSheet(state, fx.note) +
-    confirmDialog(state) + toast(state, fx.toast);
+    payoutSheet(state, fx.payout) + confirmDialog(state) + toast(state, fx.toast);
 
   scrollEl = document.getElementById('sk-scroll');
   if (scrollEl) scrollEl.scrollTop = prevScreen === state.screen ? prevTop : 0;
@@ -102,8 +105,14 @@ function render() {
   prevScreen = state.screen;
   prevSheetOpen = state.sheet === 'expense';
   prevNoteOpen = state.sheet === 'note';
+  prevPayoutOpen = state.sheet === 'payout';
   prevFabShown = fabShown();
   prevToastShown = !!state.toast;
+}
+
+function todayDDMM() {
+  const n = new Date();
+  return String(n.getDate()).padStart(2, '0') + '.' + String(n.getMonth() + 1).padStart(2, '0');
 }
 
 function showToast(msg) {
@@ -216,6 +225,38 @@ function saveNote() {
   showToast('Заметка сохранена · видит Таня');
 }
 
+function savePayout() {
+  const d = state.payoutDraft;
+  const amt = parseInt(String(d.amount || '').replace(/\D/g, ''), 10) || 0;
+  if (!amt) { showToast('Введите сумму выплаты'); return; }
+  const hid = d.homeId || state.homeId || state.homes[0].id;
+  const work = (d.work || '').trim() || 'Работы';
+  const crew = (d.crew || '').trim();
+  const date = (d.date || '').trim() || todayDDMM();
+  // выплата помечается linked: учитывается в себестоимости через связанный расход «Работа»
+  const payout = { d: date, a: amt, linked: true };
+  const exp = {
+    id: 'e' + Date.now(), date, amount: amt, cat: 'Работа', paid: true, who: 'Г',
+    text: 'ЗП: ' + work + (crew ? ' · ' + crew : ''),
+  };
+  state.homes = state.homes.map((h) => {
+    if (h.id !== hid) return h;
+    let crews = h.crews;
+    const match = (d.crewId && crews.find((c) => c.id === d.crewId))
+      || crews.find((c) => c.work.trim().toLowerCase() === work.toLowerCase());
+    if (match) {
+      crews = crews.map((c) => c === match
+        ? { ...c, crew: c.crew || crew || null, payouts: [...c.payouts, payout] }
+        : c);
+    } else {
+      crews = [...crews, { id: 'c' + Date.now(), crew: crew || null, work, agreed: null, payouts: [payout] }];
+    }
+    return { ...h, crews, expenses: [exp, ...h.expenses] };
+  });
+  state.sheet = null;
+  showToast('Выплата сохранена · видит Таня');
+}
+
 function openAct() {
   const h = state.homes.find((x) => x.id === state.homeId);
   state.signed = false;
@@ -252,7 +293,21 @@ const actions = {
   closeAct: () => { state.screen = 'object'; render(); },
   saveAct: () => { state.screen = 'object'; render(); showToast('Акт сохранён · PDF на почту'); },
   clearSig: () => { if (sigCanvas) { const cx = sigCanvas.getContext('2d'); cx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); } state.signed = false; render(); },
-  addPayout: () => showToast('Скоро: добавление выплаты'),
+  openPayout: (el) => {
+    const crewId = el && el.dataset.id ? el.dataset.id : null;
+    const h = state.homes.find((x) => x.id === state.homeId);
+    const c = crewId && h ? h.crews.find((x) => x.id === crewId) : null;
+    state.sheet = 'payout';
+    state.payoutDraft = {
+      homeId: state.homeId, crewId,
+      crew: c && c.crew ? c.crew : '',
+      work: c ? c.work : '',
+      amount: '', date: todayDDMM(),
+    };
+    render();
+  },
+  setPayoutCrew: (el) => { state.payoutDraft.crew = el.dataset.crew; render(); },
+  savePayout,
   startTour: () => startTour(),
 
   // ── Настройки: навигация ──
@@ -374,6 +429,16 @@ app.addEventListener('input', (e) => {
     state.draft.text = el.value;
   } else if (kind === 'note-text') {
     state.noteDraft.text = el.value;
+  } else if (kind === 'payout-amount') {
+    const raw = el.value.replace(/\D/g, '').slice(0, 12);
+    state.payoutDraft.amount = raw;
+    el.value = raw ? Number(raw).toLocaleString('ru-RU') : '';
+  } else if (kind === 'payout-crew') {
+    state.payoutDraft.crew = el.value;
+  } else if (kind === 'payout-work') {
+    state.payoutDraft.work = el.value;
+  } else if (kind === 'payout-date') {
+    state.payoutDraft.date = el.value;
   } else if (kind === 'act-sum') {
     const raw = el.value.replace(/\D/g, '').slice(0, 12);
     state.act.sum = raw ? Number(raw).toLocaleString('ru-RU') : '';

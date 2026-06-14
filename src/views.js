@@ -298,30 +298,44 @@ function objectTab(state, h) {
 
   if (tab === 'crews') {
     let remainTagged = false;
+    const badgePill = (color, bg) => `font-size:calc(12*var(--sk-u));font-weight:600;color:${color};background:${bg};padding:3px 9px;border-radius:999px;white-space:nowrap;flex-shrink:0`;
     const cards = h.crews.map((c) => {
       const paid = c.payouts.reduce((s, x) => s + x.a, 0);
-      const remain = c.agreed - paid;
-      const remainStyle = remain > 0
-        ? 'font-size:calc(12*var(--sk-u));font-weight:600;color:#c2410c;background:rgba(255,149,0,0.13);padding:3px 9px;border-radius:999px;white-space:nowrap;flex-shrink:0'
-        : 'font-size:calc(12*var(--sk-u));font-weight:600;color:#248a43;background:rgba(52,199,89,0.13);padding:3px 9px;border-radius:999px;white-space:nowrap;flex-shrink:0';
+      const hasAgreed = !!c.agreed;
+      const remain = hasAgreed ? c.agreed - paid : 0;
+      let badgeHtml = '';
+      if (hasAgreed && remain > 0) badgeHtml = `<span style="${badgePill('#c2410c', 'rgba(255,149,0,0.13)')}">остаток ${fmt(remain)}</span>`;
+      else if (hasAgreed && remain === 0) badgeHtml = `<span style="${badgePill('#248a43', 'rgba(52,199,89,0.13)')}">закрыто</span>`;
+      else if (hasAgreed) badgeHtml = `<span style="${badgePill('#4a48b8', 'rgba(88,86,214,0.13)')}">переплата ${fmt(-remain)}</span>`;
+      else badgeHtml = `<span style="${badgePill('rgba(var(--label),0.7)', 'var(--seg)')}">разовая</span>`;
+
       const payoutChips = c.payouts.map((p) =>
         `<span style="font-size:calc(13*var(--sk-u));color:var(--text);background:var(--bg);border-radius:9px;padding:5px 10px;font-weight:500">${esc(p.d + ' — ' + fmtShort(p.a) + ' ₽')}</span>`
       ).join('');
-      const anchor = (remain > 0 && !remainTagged) ? (remainTagged = true, ' id="sk-tour-remain"') : '';
+      const moneyLine = hasAgreed
+        ? `Договорились: ${fmt(c.agreed)} · выплачено ${fmt(paid)}`
+        : `Выплачено: ${fmt(paid)}`;
+      const crewLine = c.crew ? `<div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.5);margin-top:2px">Бригада: ${esc(c.crew)}</div>` : '';
+      const anchor = (hasAgreed && remain > 0 && !remainTagged) ? (remainTagged = true, ' id="sk-tour-remain"') : '';
       return `
         <div${anchor} style="background:var(--card);border-radius:18px;padding:15px 16px;margin-bottom:11px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
             <div style="font-size:calc(16*var(--sk-u));font-weight:600;color:var(--text);line-height:1.25">${esc(c.work)}</div>
-            <span style="${remainStyle}">${remain > 0 ? 'остаток ' + fmt(remain) : 'закрыто'}</span>
+            ${badgeHtml}
           </div>
-          <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);margin-top:4px">Договорились: ${fmt(c.agreed)} · выплачено ${fmt(paid)}</div>
+          ${crewLine}
+          <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);margin-top:4px">${moneyLine}</div>
           <div style="margin-top:11px;display:flex;flex-wrap:wrap;gap:7px">
             ${payoutChips}
-            <span data-action="addPayout" style="display:inline-flex;align-items:center;gap:5px;font-size:calc(14*var(--sk-u));color:#0a84ff;border:1px dashed rgba(10,132,255,0.4);border-radius:11px;padding:9px 14px;font-weight:600;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#0a84ff" stroke-width="2.6" stroke-linecap="round"/></svg>Выплата</span>
+            <span data-action="openPayout" data-id="${c.id}" style="display:inline-flex;align-items:center;gap:5px;font-size:calc(14*var(--sk-u));color:#0a84ff;border:1px dashed rgba(10,132,255,0.4);border-radius:11px;padding:9px 14px;font-weight:600;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#0a84ff" stroke-width="2.6" stroke-linecap="round"/></svg>Выплата</span>
           </div>
         </div>`;
     }).join('');
-    return `<div style="margin:14px 16px 0">${cards}</div>`;
+    const newBtn = `
+      <div data-action="openPayout" style="margin-top:2px;min-height:50px;background:var(--card);border-radius:15px;display:flex;align-items:center;justify-content:center;gap:7px;color:#0a84ff;font-size:calc(16*var(--sk-u));font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#0a84ff" stroke-width="2.4" stroke-linecap="round"/></svg>Выплата по новой работе
+      </div>`;
+    return `<div style="margin:14px 16px 0">${cards}${newBtn}</div>`;
   }
 
   if (tab === 'stages') {
@@ -598,6 +612,64 @@ export function noteSheet(state, animate = false) {
         <div style="padding:18px 16px 0">
           <div data-action="saveNote" style="height:52px;background:#0a84ff;border-radius:15px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:calc(17*var(--sk-u));font-weight:600;cursor:pointer">Сохранить заметку</div>
           <div style="text-align:center;font-size:calc(12*var(--sk-u));color:rgba(var(--label),0.5);margin-top:8px">Привязана к объекту · видит Таня</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ░░░░░ ЛИСТ: ВЫПЛАТА БРИГАДЕ ░░░░░
+export function payoutSheet(state, animate = false) {
+  if (state.sheet !== 'payout') return '';
+  const d = state.payoutDraft || {};
+  const dimAnim = animate ? 'animation:sk-fade 0.25s ease' : '';
+  const sheetAnim = animate ? 'animation:sk-sheet 0.32s cubic-bezier(0.32,0.72,0,1)' : '';
+  const amountDisplay = d.amount ? Number(d.amount).toLocaleString('ru-RU') : '';
+
+  const crewChips = (state.crewsDir || []).map((name) => {
+    const active = (d.crew || '') === name;
+    const style = 'font-size:calc(14*var(--sk-u));font-weight:500;padding:8px 14px;border-radius:11px;cursor:pointer;white-space:nowrap;' +
+      (active ? 'background:#0a84ff;color:#fff' : 'background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,0.04)');
+    return `<div data-action="setPayoutCrew" data-crew="${esc(name)}" style="${style}">${esc(name)}</div>`;
+  }).join('');
+
+  return `
+    <div style="position:absolute;inset:0;z-index:40">
+      <div data-action="closeSheet" style="position:absolute;inset:0;background:rgba(0,0,0,0.32);${dimAnim}"></div>
+      <div style="position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:26px 26px 0 0;padding:8px 0 30px;${sheetAnim};max-height:94%;overflow-y:auto;box-shadow:0 -8px 30px rgba(0,0,0,0.18)">
+        <div style="width:38px;height:5px;border-radius:3px;background:rgba(var(--label),0.25);margin:0 auto 6px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 18px 12px">
+          <span data-action="closeSheet" style="font-size:calc(17*var(--sk-u));color:#0a84ff;cursor:pointer">Отмена</span>
+          <span style="font-size:calc(17*var(--sk-u));font-weight:600;color:var(--text)">Выплата бригаде</span>
+          <span style="font-size:calc(17*var(--sk-u));color:rgba(var(--label),0.3);width:54px;text-align:right">·</span>
+        </div>
+
+        <div style="margin:0 16px;background:var(--card);border-radius:18px;padding:18px 18px">
+          <div style="font-size:calc(12*var(--sk-u));color:rgba(var(--label),0.6);font-weight:500">Сумма</div>
+          <div style="display:flex;align-items:baseline;gap:6px;margin-top:2px">
+            <input value="${esc(amountDisplay)}" data-input="payout-amount" inputmode="numeric" placeholder="0" style="border:none;outline:none;font-size:calc(40*var(--sk-u));font-weight:700;letter-spacing:-1px;color:var(--text);background:transparent;font-family:inherit;width:100%;min-width:0;font-variant-numeric:tabular-nums" />
+            <span style="font-size:calc(30*var(--sk-u));font-weight:600;color:rgba(var(--label),0.4)">₽</span>
+          </div>
+        </div>
+
+        <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);padding:16px 24px 7px;letter-spacing:-0.08px">БРИГАДА</div>
+        <div style="display:flex;gap:8px;padding:0 16px 10px;flex-wrap:wrap">${crewChips}</div>
+        <div style="margin:0 16px;background:var(--card);border-radius:14px;padding:2px 14px">
+          <input value="${esc(d.crew || '')}" data-input="payout-crew" placeholder="или впишите бригаду…" style="width:100%;border:none;outline:none;font-size:calc(16*var(--sk-u));color:var(--text);background:transparent;font-family:inherit;min-height:48px" />
+        </div>
+
+        <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);padding:16px 24px 7px;letter-spacing:-0.08px">ЗА КАКУЮ РАБОТУ</div>
+        <div style="margin:0 16px;background:var(--card);border-radius:14px;padding:2px 14px">
+          <input value="${esc(d.work || '')}" data-input="payout-work" placeholder="напр. кладка стен, электромонтаж" style="width:100%;border:none;outline:none;font-size:calc(16*var(--sk-u));color:var(--text);background:transparent;font-family:inherit;min-height:48px" />
+        </div>
+
+        <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);padding:16px 24px 7px;letter-spacing:-0.08px">ДАТА</div>
+        <div style="margin:0 16px;background:var(--card);border-radius:14px;padding:2px 14px">
+          <input value="${esc(d.date || '')}" data-input="payout-date" inputmode="numeric" placeholder="дд.мм" style="width:100%;border:none;outline:none;font-size:calc(16*var(--sk-u));color:var(--text);background:transparent;font-family:inherit;min-height:48px" />
+        </div>
+
+        <div style="padding:20px 16px 0">
+          <div data-action="savePayout" style="height:52px;background:#0a84ff;border-radius:15px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:calc(17*var(--sk-u));font-weight:600;cursor:pointer">Сохранить выплату</div>
+          <div style="text-align:center;font-size:calc(12*var(--sk-u));color:rgba(var(--label),0.5);margin-top:8px">Попадёт в расходы (Работа) и в себестоимость · видит Таня</div>
         </div>
       </div>
     </div>`;
