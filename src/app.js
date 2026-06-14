@@ -2,8 +2,9 @@
 // Holds state, renders the active screen + overlays into #sk-app, and wires all
 // interactions through delegated events. The signature canvas is managed
 // imperatively so an in-progress drawing survives state changes.
-import { seedHomes, STAGES } from './data.js';
-import { listScreen, objectScreen, actScreen, fab, sheet, noteSheet, settingsSheet, toast } from './views.js';
+import { seedHomes, STAGES, CATS, seedCrews, seedRequisites } from './data.js';
+import { total, obligations, fmt } from './helpers.js';
+import { listScreen, objectScreen, actScreen, fab, sheet, noteSheet, settingsScreen, confirmDialog, toast } from './views.js';
 import { initTour, getTourNode, startTour } from './tour.js';
 
 // ── accessibility prefs (тема + размер шрифта), сохраняются в localStorage ──
@@ -35,6 +36,16 @@ const state = {
   noteDraft: { text: '', photo: false, homeId: null },
   theme: loadPref('sk-theme', 'auto'),       // 'auto' | 'light' | 'dark'
   fontScale: loadPref('sk-fs', 'normal'),    // 'normal' | 'large' | 'xlarge'
+  // ── администрирование (Настройки → Управление) ──
+  settingsView: 'main',                      // 'main'|'objects'|'objectForm'|'crews'|'categories'|'stages'|'requisites'
+  settingsReturn: { screen: 'list', homeId: null, tab: 'expenses' },
+  objForm: null,                             // форма объекта (создание/редактирование)
+  adminDraft: '',                            // поле «Добавить…» в списках-справочниках
+  confirm: null,                             // { text, okLabel, yes }
+  crewsDir: seedCrews(),                     // справочник постоянных бригад
+  categories: [...CATS],                     // редактируемые категории расходов
+  stagesTemplate: [...STAGES],               // шаблон этапов для новых объектов
+  requisites: seedRequisites(),              // реквизиты исполнителя для актов
   homes: seedHomes(),
 };
 
@@ -46,7 +57,6 @@ applyFont(state.fontScale);
 let prevScreen = null;
 let prevSheetOpen = false;
 let prevNoteOpen = false;
-let prevSettingsOpen = false;
 let prevFabShown = false;
 let prevToastShown = false;
 let toastTimer = null;
@@ -65,12 +75,12 @@ function render() {
   const screenHtml =
     state.screen === 'list' ? listScreen(state) :
     state.screen === 'object' ? objectScreen(state) :
+    state.screen === 'settings' ? settingsScreen(state) :
     actScreen(state);
 
   const fx = {
     sheet: state.sheet === 'expense' && !prevSheetOpen,
     note: state.sheet === 'note' && !prevNoteOpen,
-    settings: state.sheet === 'settings' && !prevSettingsOpen,
     fab: fabShown() && !prevFabShown,
     toast: !!state.toast && !prevToastShown,
   };
@@ -78,7 +88,7 @@ function render() {
   app.innerHTML =
     `<div class="sk-scroll" id="sk-scroll">${screenHtml}</div>` +
     fab(state, fx.fab) + sheet(state, fx.sheet) + noteSheet(state, fx.note) +
-    settingsSheet(state, fx.settings) + toast(state, fx.toast);
+    confirmDialog(state) + toast(state, fx.toast);
 
   scrollEl = document.getElementById('sk-scroll');
   if (scrollEl) scrollEl.scrollTop = prevScreen === state.screen ? prevTop : 0;
@@ -92,7 +102,6 @@ function render() {
   prevScreen = state.screen;
   prevSheetOpen = state.sheet === 'expense';
   prevNoteOpen = state.sheet === 'note';
-  prevSettingsOpen = state.sheet === 'settings';
   prevFabShown = fabShown();
   prevToastShown = !!state.toast;
 }
@@ -210,7 +219,8 @@ function saveNote() {
 function openAct() {
   const h = state.homes.find((x) => x.id === state.homeId);
   state.signed = false;
-  state.act = { client: '', object: h ? h.name : '', works: h ? STAGES[h.stageIndex] : '', sum: '' };
+  const stages = h ? (h.stages || STAGES) : STAGES;
+  state.act = { client: h && h.client ? h.client : '', object: h ? h.name : '', works: h ? stages[h.stageIndex] : '', sum: '' };
   state.screen = 'act';
   render();
 }
@@ -244,9 +254,103 @@ const actions = {
   clearSig: () => { if (sigCanvas) { const cx = sigCanvas.getContext('2d'); cx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); } state.signed = false; render(); },
   addPayout: () => showToast('Скоро: добавление выплаты'),
   startTour: () => startTour(),
-  openSettings: () => { state.sheet = 'settings'; render(); },
+
+  // ── Настройки: навигация ──
+  openSettings: () => {
+    state.settingsReturn = { screen: state.screen, homeId: state.homeId, tab: state.tab };
+    state.screen = 'settings'; state.settingsView = 'main'; state.sheet = null; render();
+  },
+  settingsBack: () => {
+    if (state.settingsView === 'objectForm') state.settingsView = 'objects';
+    else if (state.settingsView !== 'main') state.settingsView = 'main';
+    else { const r = state.settingsReturn; state.screen = r.screen || 'list'; state.homeId = r.homeId; state.tab = r.tab || 'expenses'; }
+    render();
+  },
+  settingsGo: (el) => { state.settingsView = el.dataset.view; state.adminDraft = ''; render(); },
   setTheme: (el) => { state.theme = el.dataset.theme; applyTheme(state.theme); render(); },
   setFontScale: (el) => { state.fontScale = el.dataset.scale; applyFont(state.fontScale); render(); },
+  openReqFromAct: () => { state.settingsReturn = { screen: 'object', homeId: state.homeId, tab: state.tab }; state.screen = 'settings'; state.settingsView = 'requisites'; render(); },
+
+  // ── Объекты (CRUD + архив) ──
+  objAddNew: () => { state.objForm = { id: null, name: '', type: 'contract', client: '', price: '' }; state.settingsView = 'objectForm'; render(); },
+  objEdit: (el) => {
+    const h = state.homes.find((x) => x.id === el.dataset.id);
+    if (!h) return;
+    state.objForm = { id: h.id, name: h.name, type: h.type, client: h.client || '', price: h.price ? String(h.price) : '' };
+    state.settingsView = 'objectForm'; render();
+  },
+  setObjType: (el) => { if (state.objForm) state.objForm.type = el.dataset.type; render(); },
+  objSave: () => {
+    const f = state.objForm; if (!f) return;
+    const name = (f.name || '').trim();
+    if (!name) { showToast('Введите название объекта'); return; }
+    const price = parseInt(String(f.price || '').replace(/\D/g, ''), 10) || null;
+    const client = f.type === 'contract' ? (f.client || '').trim() : null;
+    if (f.id) {
+      state.homes = state.homes.map((h) => h.id === f.id ? { ...h, name, short: name, type: f.type, client, price } : h);
+    } else {
+      state.homes = [...state.homes, {
+        id: 'h' + Date.now(), name, short: name, address: '', type: f.type, client, price,
+        base: 0, stageIndex: 0, expenses: [], crews: [], clientPayments: [], notes: [],
+        stages: [...state.stagesTemplate], archived: false,
+      }];
+    }
+    state.objForm = null; state.settingsView = 'objects'; showToast('Объект сохранён');
+  },
+  objArchiveToggle: (el) => {
+    state.homes = state.homes.map((h) => h.id === el.dataset.id ? { ...h, archived: !h.archived } : h);
+    render();
+  },
+  askObjDelete: (el) => {
+    const h = state.homes.find((x) => x.id === el.dataset.id); if (!h) return;
+    state.confirm = { text: `Удалить объект «${h.name}»? Данные объекта будут потеряны.`, okLabel: 'Удалить', yes: () => { state.homes = state.homes.filter((x) => x.id !== h.id); } };
+    render();
+  },
+
+  // ── Справочники (бригады / категории / этапы) ──
+  addAdminItem: (el) => {
+    const store = el.dataset.store; const v = (state.adminDraft || '').trim();
+    if (v) { state[store] = [...(state[store] || []), v]; state.adminDraft = ''; }
+    render();
+  },
+  delAdminItem: (el) => {
+    const store = el.dataset.store; const idx = +el.dataset.idx;
+    state[store] = (state[store] || []).filter((_, i) => i !== idx);
+    render();
+  },
+  setReqForm: (el) => { state.requisites.form = el.dataset.form; render(); },
+
+  // ── Данные ──
+  exportData: () => {
+    const data = { homes: state.homes, crewsDir: state.crewsDir, categories: state.categories, stagesTemplate: state.stagesTemplate, requisites: state.requisites, exportedAt: new Date().toISOString() };
+    try {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'stroykontrol-backup.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast('Резервная копия выгружена');
+    } catch (e) { showToast('Не удалось выгрузить'); }
+  },
+  printSummary: () => {
+    const rows = state.homes.filter((h) => !h.archived).map((h) =>
+      `<tr><td>${h.name}</td><td style="text-align:right">${fmt(total(h))}</td><td style="text-align:right">${fmt(obligations(h))}</td></tr>`).join('');
+    const win = window.open('', '_blank');
+    if (!win) { showToast('Разрешите всплывающие окна для печати'); return; }
+    win.document.write(`<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>СтройКонтроль — сводка</title></head><body style="font-family:-apple-system,system-ui,sans-serif;padding:24px;color:#1c1c1e"><h2>СтройКонтроль — сводка</h2><table cellpadding="8" cellspacing="0" style="border-collapse:collapse;width:100%"><thead><tr style="border-bottom:2px solid #1c1c1e"><th style="text-align:left">Объект</th><th style="text-align:right">Себестоимость</th><th style="text-align:right">К оплате</th></tr></thead><tbody>${rows}</tbody></table><p style="color:#666;margin-top:16px">Сформировано: ${new Date().toLocaleString('ru-RU')}</p></body></html>`);
+    win.document.close(); win.focus();
+    setTimeout(() => { try { win.print(); } catch (e) {} }, 250);
+  },
+  askResetDemo: () => {
+    state.confirm = { text: 'Сбросить все данные к исходному демонабору? Текущие изменения будут потеряны.', okLabel: 'Сбросить', yes: () => {
+      state.homes = seedHomes(); state.crewsDir = seedCrews(); state.categories = [...CATS];
+      state.stagesTemplate = [...STAGES]; state.requisites = seedRequisites();
+      state.settingsView = 'main'; showToast('Демо-данные восстановлены');
+    } };
+    render();
+  },
+  confirmNo: () => { state.confirm = null; render(); },
+  confirmYes: () => { const c = state.confirm; state.confirm = null; if (c && c.yes) c.yes(); render(); },
 };
 
 // ── click delegation ──
@@ -280,6 +384,25 @@ app.addEventListener('input', (e) => {
     state.act.object = el.value;
   } else if (kind === 'act-works') {
     state.act.works = el.value;
+  } else if (kind === 'adminDraft') {
+    state.adminDraft = el.value;
+  } else if (kind === 'edit') {
+    const store = el.dataset.store; const idx = +el.dataset.idx;
+    if (state[store]) state[store] = state[store].map((it, i) => (i === idx ? el.value : it));
+  } else if (kind === 'obj-name') {
+    if (state.objForm) state.objForm.name = el.value;
+  } else if (kind === 'obj-client') {
+    if (state.objForm) state.objForm.client = el.value;
+  } else if (kind === 'obj-price') {
+    const raw = el.value.replace(/\D/g, '').slice(0, 12);
+    if (state.objForm) state.objForm.price = raw;
+    el.value = raw ? Number(raw).toLocaleString('ru-RU') : '';
+  } else if (kind === 'req-name') {
+    state.requisites.name = el.value;
+  } else if (kind === 'req-inn') {
+    state.requisites.inn = el.value;
+  } else if (kind === 'req-extra') {
+    state.requisites.extra = el.value;
   }
 });
 
@@ -321,9 +444,27 @@ initTour(app, {
   setTab: (k) => { state.tab = k; render(); },
 });
 
-// ── PWA: register the offline service worker when served over http(s) ──
+// ── PWA: register SW; auto-reload once when a new version takes control ──
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // не перезагружаем при самой первой установке (контроллера ещё не было)
+    if (reloading || !hadController) return;
+    reloading = true;
+    window.location.reload();
+  });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      // если новая версия уже ждёт — активировать сразу
+      if (reg.waiting) reg.waiting.postMessage('skipWaiting');
+      reg.addEventListener('updatefound', () => {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', () => {
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) sw.postMessage('skipWaiting');
+        });
+      });
+    }).catch(() => {});
   });
 }

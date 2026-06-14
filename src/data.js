@@ -9,6 +9,16 @@ export const STAGES = [
 
 export const CATS = ['Материалы', 'Работа', 'Техника', 'Логистика', 'Прочее'];
 
+// Справочник постоянных бригад (выбирается при выплате).
+export const seedCrews = () => [
+  'Бригада Ивана (каменщики)', 'Кровельщики', 'Электрики', 'Отделочники', 'Разнорабочие',
+];
+
+// Реквизиты исполнителя для актов (заполняются один раз, подставляются в акт).
+export const seedRequisites = () => ({
+  form: 'ИП', name: 'Петров Григорий Сергеевич', inn: '770112345678', extra: 'р/с 40802…, Сбербанк',
+});
+
 // category -> [chip background, chip text color]
 export const CAT_COLOR = {
   'Материалы': ['rgba(10,132,255,0.12)', '#0a6fd6'],
@@ -19,10 +29,10 @@ export const CAT_COLOR = {
 };
 
 export function seedHomes() {
-  return [
+  const list = [
     {
       id: 'sosnovaya', name: 'Дом на Сосновой', short: 'Сосновая', address: 'КП Сосновый Бор, уч. 14',
-      type: 'contract', price: 8500000, base: 1820000, stageIndex: 2,
+      type: 'contract', client: 'Иванов И. И.', price: 8500000, base: 1820000, stageIndex: 2,
       expenses: [
         { id: 'e1', date: '08.06', text: 'Бетон М300, 26 м³ — перекрытие', amount: 312000, cat: 'Материалы', paid: true, who: 'Г', photo: true },
         { id: 'e2', date: '06.06', text: 'Кирпич облицовочный, 4 поддона', amount: 268000, cat: 'Материалы', paid: false, who: 'Г', photo: true },
@@ -42,7 +52,7 @@ export function seedHomes() {
     {
       id: 'berezovaya', name: 'Дом на продажу, Берёзовая 12', short: 'Берёзовая 12', address: 'ул. Берёзовая, 12',
       // spec (на продажу): `price` здесь — цена продажи; маржа = цена − себестоимость
-      type: 'spec', price: 3200000, base: 1660000, stageIndex: 3,
+      type: 'spec', client: null, price: 3200000, base: 1660000, stageIndex: 3,
       expenses: [
         { id: 'e6', date: '07.06', text: 'Металлочерепица + комплектующие', amount: 198000, cat: 'Материалы', paid: true, who: 'Г', photo: true },
         { id: 'e7', date: '01.06', text: 'Пиломатериал на стропила', amount: 142000, cat: 'Материалы', paid: true, who: 'Г', photo: true },
@@ -56,7 +66,7 @@ export function seedHomes() {
     },
     {
       id: 'lesnoy', name: 'Коттедж в Лесном', short: 'Лесной', address: 'д. Лесная, уч. 3',
-      type: 'contract', price: 14200000, base: 11300000, stageIndex: 4,
+      type: 'contract', client: 'Смирнова Е. П.', price: 14200000, base: 11300000, stageIndex: 4,
       expenses: [
         { id: 'e9', date: '09.06', text: 'Тёплый пол, трубы + коллектор', amount: 176000, cat: 'Материалы', paid: true, who: 'Г', photo: true },
         { id: 'e10', date: '05.06', text: 'Гипсокартон, профиль, крепёж', amount: 128000, cat: 'Материалы', paid: false, who: 'Г' },
@@ -76,4 +86,6 @@ export function seedHomes() {
       ],
     },
   ];
+  // у каждого объекта — свой (редактируемый) набор этапов + флаг архива
+  return list.map((h) => ({ archived: false, stages: [...STAGES], ...h }));
 }

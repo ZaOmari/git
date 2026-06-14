@@ -31,7 +31,7 @@ const backChevron = (label, action) =>
 
 // ░░░░░ СПИСОК ОБЪЕКТОВ ░░░░░
 export function listScreen(state) {
-  const homes = state.homes;
+  const homes = state.homes.filter((h) => !h.archived); // архивные скрыты из главного списка
   const allTotal = homes.reduce((s, h) => s + total(h), 0);
   const allOblig = totalObligations(homes);
 
@@ -81,8 +81,8 @@ export function listScreen(state) {
         <div style="margin-top:13px;padding-top:12px;border-top:0.5px solid rgba(var(--label),0.1);display:flex;align-items:center;justify-content:space-between;gap:8px">
           <div style="display:flex;align-items:center;gap:6px;min-width:0">
             <span style="width:6px;height:6px;border-radius:50%;background:#0a84ff;flex-shrink:0"></span>
-            <span style="font-size:calc(13*var(--sk-u));color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(STAGES[h.stageIndex])}</span>
-            <span style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.4)">· ${h.stageIndex + 1} из ${STAGES.length}</span>
+            <span style="font-size:calc(13*var(--sk-u));color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc((h.stages || STAGES)[h.stageIndex])}</span>
+            <span style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.4)">· ${h.stageIndex + 1} из ${(h.stages || STAGES).length}</span>
           </div>
           ${unpaidLabel ? `<span style="font-size:calc(12*var(--sk-u));font-weight:600;color:#c2410c;background:rgba(255,149,0,0.13);padding:3px 8px;border-radius:999px;white-space:nowrap;flex-shrink:0">${esc(unpaidLabel)}</span>` : ''}
         </div>
@@ -325,7 +325,8 @@ function objectTab(state, h) {
   }
 
   if (tab === 'stages') {
-    const rows = STAGES.map((name, i) => {
+    const stages = h.stages || STAGES;
+    const rows = stages.map((name, i) => {
       const done = i < h.stageIndex, current = i === h.stageIndex;
       const dotStyle = done
         ? 'width:24px;height:24px;border-radius:50%;background:#0a84ff;color:#fff;font-size:calc(13*var(--sk-u));font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0'
@@ -335,7 +336,7 @@ function objectTab(state, h) {
       const weight = current ? '700' : '500';
       const textColor = current || done ? '#1c1c1e' : 'rgba(var(--label),0.5)';
       const lineColor = done ? '#0a84ff' : 'rgba(var(--label),0.12)';
-      const connector = i < STAGES.length - 1
+      const connector = i < stages.length - 1
         ? `<span style="width:2px;height:22px;background:${lineColor};margin-top:3px"></span>` : '';
       const actBtn = current
         ? `<div id="sk-tour-act" data-action="openAct" style="display:inline-flex;align-items:center;gap:6px;margin-top:9px;background:#0a84ff;color:#fff;font-size:calc(14*var(--sk-u));font-weight:600;padding:8px 14px;border-radius:11px;cursor:pointer">
@@ -446,6 +447,14 @@ export function actScreen(state) {
         ${field('Этап / работы', 'works', a.works)}
         ${field('Сумма, ₽', 'sum', a.sum, 'inputmode="numeric" placeholder="0"')}
       </div>
+      <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);padding:18px 24px 8px;letter-spacing:-0.08px">ИСПОЛНИТЕЛЬ</div>
+      <div style="margin:0 16px;background:var(--card);border-radius:18px;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
+        ${(() => { const r = state.requisites || {};
+          return `<div style="font-size:calc(16*var(--sk-u));color:var(--text);font-weight:500">${esc(r.form ? r.form + ' · ' : '')}${esc(r.name || 'Реквизиты не заданы')}</div>
+            ${r.inn ? `<div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);margin-top:3px">ИНН ${esc(r.inn)}${r.extra ? ' · ' + esc(r.extra) : ''}</div>` : ''}`;
+        })()}
+        <div data-action="openReqFromAct" style="font-size:calc(13*var(--sk-u));color:#0a84ff;margin-top:8px;cursor:pointer">Изменить в Настройках</div>
+      </div>
       <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);padding:18px 24px 8px;letter-spacing:-0.08px">ПОДПИСЬ КЛИЕНТА</div>
       <div style="margin:0 16px;background:var(--card);border-radius:18px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,0.04)">
         <div style="position:relative;border:1.5px dashed rgba(var(--label),0.2);border-radius:12px;background:var(--card2);height:150px;touch-action:none">
@@ -492,9 +501,10 @@ export function sheet(state, animate = false) {
     return `<div data-action="setDraftHome" data-id="${hm.id}" style="${style}">${esc(hm.short || hm.name)}</div>`;
   }).join('');
 
-  const catChips = CATS.map((c) => {
+  const cats = state.categories && state.categories.length ? state.categories : CATS;
+  const catChips = cats.map((c) => {
     const active = d.category === c;
-    const cc = CAT_COLOR[c];
+    const cc = CAT_COLOR[c] || CAT_COLOR['Прочее'];
     const style = 'font-size:calc(14*var(--sk-u));font-weight:500;padding:8px 14px;border-radius:11px;cursor:pointer;white-space:nowrap;' +
       (active ? `background:${cc[1]};color:#fff` : 'background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,0.04)');
     return `<div data-action="setCategory" data-cat="${esc(c)}" style="${style}">${esc(c)}</div>`;
@@ -593,52 +603,6 @@ export function noteSheet(state, animate = false) {
     </div>`;
 }
 
-// ░░░░░ ЛИСТ: НАСТРОЙКИ (тема + размер) ░░░░░
-export function settingsSheet(state, animate = false) {
-  if (state.sheet !== 'settings') return '';
-  const dimAnim = animate ? 'animation:sk-fade 0.25s ease' : '';
-  const sheetAnim = animate ? 'animation:sk-sheet 0.32s cubic-bezier(0.32,0.72,0,1)' : '';
-  const check = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7" stroke="#0a84ff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-  const themeOpts = [['auto', 'Авто'], ['light', 'Светлая'], ['dark', 'Тёмная']];
-  const themeRows = themeOpts.map(([k, l], i) => {
-    const active = state.theme === k;
-    const last = i === themeOpts.length - 1;
-    return `<div data-action="setTheme" data-theme="${k}" style="display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 18px;cursor:pointer;${last ? '' : 'border-bottom:0.5px solid rgba(var(--label),0.1)'}">
-       <span style="font-size:calc(17*var(--sk-u));color:var(--text);font-weight:${active ? '600' : '400'}">${l}</span>
-       ${active ? check : ''}
-     </div>`;
-  }).join('');
-
-  // три ступени размера; буквы растут, чтобы выбор был очевиден
-  const sizeOpts = [['normal', 'А', 16], ['large', 'А', 20], ['xlarge', 'А', 25]];
-  const sizeBtns = sizeOpts.map(([k, l, fs]) => {
-    const active = state.fontScale === k;
-    return `<div data-action="setFontScale" data-scale="${k}" style="flex:1;min-height:64px;display:flex;align-items:center;justify-content:center;border-radius:14px;cursor:pointer;font-weight:700;font-size:calc(${fs}*var(--sk-u));${active ? 'background:#0a84ff;color:#fff' : 'background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,0.06)'}">${l}</div>`;
-  }).join('');
-
-  const groupHead = (t) => `<div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);padding:18px 24px 8px;letter-spacing:-0.08px">${t}</div>`;
-
-  return `
-    <div style="position:absolute;inset:0;z-index:40">
-      <div data-action="closeSheet" style="position:absolute;inset:0;background:rgba(0,0,0,0.32);${dimAnim}"></div>
-      <div style="position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:26px 26px 0 0;padding:8px 0 30px;${sheetAnim};max-height:94%;overflow-y:auto;box-shadow:0 -8px 30px rgba(0,0,0,0.18)">
-        <div style="width:38px;height:5px;border-radius:3px;background:rgba(var(--label),0.25);margin:0 auto 6px"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 18px 6px">
-          <span style="width:64px"></span>
-          <span style="font-size:calc(17*var(--sk-u));font-weight:600;color:var(--text)">Настройки</span>
-          <span data-action="closeSheet" style="width:64px;text-align:right;font-size:calc(17*var(--sk-u));color:#0a84ff;font-weight:600;cursor:pointer">Готово</span>
-        </div>
-
-        ${groupHead('ТЕМА')}
-        <div style="margin:0 16px;background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04)">${themeRows}</div>
-
-        ${groupHead('РАЗМЕР ТЕКСТА')}
-        <div style="display:flex;gap:10px;padding:0 16px">${sizeBtns}</div>
-        <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.5);padding:10px 24px 0;line-height:1.4">Обычный · крупный · очень крупный. Приложение подстраивается под размер текста в настройках телефона.</div>
-      </div>
-    </div>`;
-}
 
 // ░░░░░ ТОСТ ░░░░░
 export function toast(state, animate = false) {
@@ -648,5 +612,231 @@ export function toast(state, animate = false) {
     <div style="position:absolute;left:50%;bottom:118px;z-index:50;display:flex;align-items:center;gap:9px;background:var(--invert);color:#fff;padding:11px 18px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,0.3);${anim}white-space:nowrap">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#34c759"/><path d="M7 12.5l3 3 6-6.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span style="font-size:calc(14*var(--sk-u));font-weight:500">${esc(state.toast)}</span>
+    </div>`;
+}
+
+// ░░░░░░░░░░ ЭКРАН: НАСТРОЙКИ И УПРАВЛЕНИЕ ░░░░░░░░░░
+const SK_CHEVR = '<svg width="9" height="15" viewBox="0 0 9 15" fill="none" style="flex-shrink:0"><path d="M1.5 1.5l6 6-6 6" stroke="rgba(var(--label),0.35)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const SK_CHECK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7" stroke="#0a84ff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+const skGroupHead = (t) =>
+  `<div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);padding:20px 24px 8px;letter-spacing:-0.08px">${t}</div>`;
+
+// Каркас экрана настроек: шапка с «назад» + крупный заголовок + тело.
+function skChrome(title, body, backLabel) {
+  return `
+    <div style="padding-bottom:120px">
+      <div style="padding:54px 16px 0;display:flex;align-items:center">
+        <div data-action="settingsBack" style="display:flex;align-items:center;gap:2px;cursor:pointer;color:#0a84ff;margin-left:-4px">
+          <svg width="11" height="18" viewBox="0 0 11 18" fill="none"><path d="M9 2L2 9l7 7" stroke="#0a84ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="font-size:calc(17*var(--sk-u));letter-spacing:-0.3px">${esc(backLabel || 'Назад')}</span>
+        </div>
+      </div>
+      <div style="padding:14px 20px 6px"><div style="font-size:calc(28*var(--sk-u));font-weight:700;letter-spacing:-0.5px;color:var(--text)">${esc(title)}</div></div>
+      ${body}
+    </div>`;
+}
+
+const skNavRow = (label, view, sub, last) =>
+  `<div data-action="settingsGo" data-view="${view}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:58px;padding:8px 18px;cursor:pointer;${last ? '' : 'border-bottom:0.5px solid rgba(var(--label),0.1)'}">
+     <span style="font-size:calc(17*var(--sk-u));color:var(--text)">${esc(label)}</span>
+     <span style="display:flex;align-items:center;gap:8px">${sub ? `<span style="font-size:calc(15*var(--sk-u));color:rgba(var(--label),0.5)">${esc(sub)}</span>` : ''}${SK_CHEVR}</span>
+   </div>`;
+
+const skActionRow = (label, action, last, danger) =>
+  `<div data-action="${action}" style="display:flex;align-items:center;justify-content:space-between;min-height:58px;padding:8px 18px;cursor:pointer;${last ? '' : 'border-bottom:0.5px solid rgba(var(--label),0.1)'}">
+     <span style="font-size:calc(17*var(--sk-u));color:${danger ? '#ff3b30' : 'var(--text)'}">${esc(label)}</span>
+     ${danger ? '' : SK_CHEVR}
+   </div>`;
+
+const skCard = (inner) =>
+  `<div style="margin:0 16px;background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04)">${inner}</div>`;
+
+const skBigBtn = (label, action, opts = {}) =>
+  `<div data-action="${action}"${opts.id ? ` data-id="${opts.id}"` : ''} style="min-height:${opts.h || 52}px;padding:0 18px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:14px;cursor:pointer;font-size:calc(${opts.fs || 16}*var(--sk-u));font-weight:600;${opts.style || 'background:#0a84ff;color:#fff'}">${label}</div>`;
+
+export function settingsScreen(state) {
+  const v = state.settingsView || 'main';
+  if (v === 'objects') return skObjects(state);
+  if (v === 'objectForm') return skObjectForm(state);
+  if (v === 'crews') return skList(state, 'crewsDir', 'Бригады', 'Постоянные бригады. Их можно выбрать при добавлении выплаты.');
+  if (v === 'categories') return skList(state, 'categories', 'Категории расходов', 'Метки подсказываются при вводе расхода. Категория необязательна.');
+  if (v === 'stages') return skList(state, 'stagesTemplate', 'Шаблон этапов', 'Предлагается новым объектам. У существующих объектов этапы свои.');
+  if (v === 'requisites') return skRequisites(state);
+  return skMain(state);
+}
+
+function skMain(state) {
+  const themeOpts = [['auto', 'Авто'], ['light', 'Светлая'], ['dark', 'Тёмная']];
+  const themeRows = themeOpts.map(([k, l], i) =>
+    `<div data-action="setTheme" data-theme="${k}" style="display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 18px;cursor:pointer;${i === themeOpts.length - 1 ? '' : 'border-bottom:0.5px solid rgba(var(--label),0.1)'}">
+       <span style="font-size:calc(17*var(--sk-u));color:var(--text);font-weight:${state.theme === k ? '600' : '400'}">${l}</span>
+       ${state.theme === k ? SK_CHECK : ''}
+     </div>`).join('');
+
+  const sizeOpts = [['normal', 'А', 16], ['large', 'А', 20], ['xlarge', 'А', 25]];
+  const sizeBtns = sizeOpts.map(([k, l, fs]) =>
+    `<div data-action="setFontScale" data-scale="${k}" style="flex:1;min-height:64px;display:flex;align-items:center;justify-content:center;border-radius:14px;cursor:pointer;font-weight:700;font-size:calc(${fs}*var(--sk-u));${state.fontScale === k ? 'background:#0a84ff;color:#fff' : 'background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,0.06)'}">${l}</div>`).join('');
+
+  const activeCount = state.homes.filter((h) => !h.archived).length;
+  const archived = state.homes.length - activeCount;
+  const reqName = state.requisites && state.requisites.name ? (state.requisites.form || '') : 'не заданы';
+
+  const body = `
+    ${skGroupHead('ВНЕШНИЙ ВИД')}
+    ${skCard(themeRows)}
+    <div style="display:flex;gap:10px;padding:10px 16px 0">${sizeBtns}</div>
+    <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.5);padding:8px 24px 0;line-height:1.4">Обычный · крупный · очень крупный. Учитывается и размер текста в настройках телефона.</div>
+
+    ${skGroupHead('УПРАВЛЕНИЕ')}
+    ${skCard(
+      skNavRow('Объекты', 'objects', archived ? `${activeCount} + ${archived} в архиве` : String(activeCount)) +
+      skNavRow('Бригады', 'crews', String((state.crewsDir || []).length)) +
+      skNavRow('Категории расходов', 'categories', String((state.categories || []).length)) +
+      skNavRow('Шаблон этапов', 'stages', String((state.stagesTemplate || []).length)) +
+      skNavRow('Реквизиты для актов', 'requisites', reqName, true)
+    )}
+
+    ${skGroupHead('ДАННЫЕ')}
+    ${skCard(
+      skActionRow('Резервная копия (выгрузка)', 'exportData') +
+      skActionRow('Печать сводки (PDF)', 'printSummary') +
+      skActionRow('Сбросить демо-данные', 'askResetDemo', true, true)
+    )}
+
+    ${skGroupHead('УЧАСТНИКИ')}
+    ${skCard(
+      `<div style="display:flex;align-items:center;justify-content:space-between;min-height:54px;padding:0 18px;border-bottom:0.5px solid rgba(var(--label),0.1)"><span style="font-size:calc(17*var(--sk-u));color:var(--text)">Таня</span><span style="font-size:calc(14*var(--sk-u));color:rgba(var(--label),0.5)">финансы, документы</span></div>
+       <div style="display:flex;align-items:center;justify-content:space-between;min-height:54px;padding:0 18px"><span style="font-size:calc(17*var(--sk-u));color:var(--text)">Гриша</span><span style="font-size:calc(14*var(--sk-u));color:rgba(var(--label),0.5)">стройка, материалы</span></div>`
+    )}
+    <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.5);padding:8px 24px 0;line-height:1.4">Оба — равноправные партнёры, данные общие.</div>`;
+
+  return skChrome('Настройки', body, 'Готово');
+}
+
+function skObjects(state) {
+  const cards = state.homes.map((h) => {
+    const sub = h.type === 'contract'
+      ? `По договору · ${esc(h.client || 'клиент не указан')} · ${fmt(h.price || 0)}`
+      : `На продажу · цена ${h.price ? fmt(h.price) : '—'}`;
+    return `
+      <div style="margin:0 16px 12px;background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,0.04);${h.archived ? 'opacity:0.62' : ''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="font-size:calc(17*var(--sk-u));font-weight:600;color:var(--text)">${esc(h.name)}</div>
+          <span style="${badge(h.type)}">${h.type === 'contract' ? 'По договору' : 'На продажу'}</span>
+        </div>
+        <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);margin-top:4px">${sub}${h.archived ? ' · в архиве' : ''}</div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          ${skBigBtn('Изменить', 'objEdit', { id: h.id, h: 44, fs: 15, style: 'color:#0a84ff;background:rgba(10,132,255,0.1)' })}
+          ${skBigBtn(h.archived ? 'Из архива' : 'В архив', 'objArchiveToggle', { id: h.id, h: 44, fs: 15, style: 'color:var(--text);background:var(--seg)' })}
+          ${skBigBtn('Удалить', 'askObjDelete', { id: h.id, h: 44, fs: 15, style: 'color:#ff3b30;background:rgba(255,59,48,0.1)' })}
+        </div>
+      </div>`;
+  }).join('');
+
+  const body = `
+    <div style="padding:0 16px 4px">
+      ${skBigBtn('<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>Новый объект', 'objAddNew', { h: 52 })}
+    </div>
+    <div style="height:14px"></div>
+    ${cards}`;
+  return skChrome('Объекты', body, 'Настройки');
+}
+
+function skObjectForm(state) {
+  const f = state.objForm || { id: null, name: '', type: 'contract', client: '', price: '' };
+  const isContract = f.type === 'contract';
+  const segBase = 'flex:1;text-align:center;padding:11px 4px;border-radius:9px;font-size:calc(15*var(--sk-u));cursor:pointer;';
+  const typeSeg =
+    `<div data-action="setObjType" data-type="contract" style="${segBase}${isContract ? 'font-weight:600;color:var(--text);background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,0.12)' : 'font-weight:500;color:rgba(var(--label),0.6)'}">По договору</div>` +
+    `<div data-action="setObjType" data-type="spec" style="${segBase}${!isContract ? 'font-weight:600;color:var(--text);background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,0.12)' : 'font-weight:500;color:rgba(var(--label),0.6)'}">На продажу</div>`;
+
+  const inp = (label, key, value, extra = '') =>
+    `<label style="display:block;padding:11px 16px;border-bottom:0.5px solid rgba(var(--label),0.1)">
+       <span style="font-size:calc(12*var(--sk-u));color:rgba(var(--label),0.6);font-weight:500">${label}</span>
+       <input value="${esc(value)}" data-input="${key}" ${extra} style="width:100%;border:none;outline:none;font-size:calc(17*var(--sk-u));color:var(--text);margin-top:4px;background:transparent;font-family:inherit;min-height:28px" />
+     </label>`;
+
+  const priceLabel = isContract ? 'Стоимость по договору, ₽' : 'Цена продажи, ₽';
+  const priceDisplay = f.price ? Number(String(f.price).replace(/\D/g, '')).toLocaleString('ru-RU') : '';
+
+  const body = `
+    <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);padding:8px 24px 8px;letter-spacing:-0.08px">ТИП</div>
+    <div style="margin:0 16px;background:var(--seg);border-radius:11px;padding:2px;display:flex;gap:2px">${typeSeg}</div>
+    <div style="height:14px"></div>
+    ${skCard(
+      inp('Название', 'obj-name', f.name, 'placeholder="напр. Дом на Озёрной"') +
+      (isContract ? inp('Клиент', 'obj-client', f.client, 'placeholder="ФИО заказчика"') : '') +
+      `<label style="display:block;padding:11px 16px">
+         <span style="font-size:calc(12*var(--sk-u));color:rgba(var(--label),0.6);font-weight:500">${priceLabel}</span>
+         <input value="${esc(priceDisplay)}" data-input="obj-price" inputmode="numeric" placeholder="0" style="width:100%;border:none;outline:none;font-size:calc(17*var(--sk-u));color:var(--text);margin-top:4px;background:transparent;font-family:inherit;min-height:28px" />
+       </label>`
+    )}
+    <div style="padding:20px 16px 0">${skBigBtn(f.id ? 'Сохранить' : 'Создать объект', 'objSave', { h: 54, fs: 17 })}</div>`;
+  return skChrome(f.id ? 'Изменить объект' : 'Новый объект', body, 'Объекты');
+}
+
+function skList(state, store, title, hint) {
+  const items = state[store] || [];
+  const rows = items.length
+    ? items.map((it, idx) =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px 6px 16px;${idx < items.length - 1 ? 'border-bottom:0.5px solid rgba(var(--label),0.1)' : ''}">
+           <input value="${esc(it)}" data-input="edit" data-store="${store}" data-idx="${idx}" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:calc(16*var(--sk-u));color:var(--text);font-family:inherit;min-height:44px" />
+           <div data-action="delAdminItem" data-store="${store}" data-idx="${idx}" title="Удалить" style="width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#ff3b30;font-size:calc(18*var(--sk-u));flex-shrink:0">✕</div>
+         </div>`).join('')
+    : `<div style="padding:20px 16px;text-align:center;color:rgba(var(--label),0.45);font-size:calc(14*var(--sk-u))">Пока пусто</div>`;
+
+  const body = `
+    ${hint ? `<div style="margin:0 24px 10px;font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.55);line-height:1.4">${esc(hint)}</div>` : ''}
+    ${skCard(rows)}
+    <div style="display:flex;gap:10px;margin:14px 16px 0">
+      <input value="${esc(state.adminDraft || '')}" data-input="adminDraft" placeholder="Добавить…" style="flex:1;min-height:52px;border:none;outline:none;background:var(--card);border-radius:14px;padding:0 16px;font-size:calc(16*var(--sk-u));color:var(--text);font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,0.04)" />
+      <div data-action="addAdminItem" data-store="${store}" style="min-width:112px;min-height:52px;display:flex;align-items:center;justify-content:center;background:#0a84ff;color:#fff;border-radius:14px;font-size:calc(16*var(--sk-u));font-weight:600;cursor:pointer">Добавить</div>
+    </div>`;
+  return skChrome(title, body, 'Настройки');
+}
+
+function skRequisites(state) {
+  const r = state.requisites || { form: 'ИП', name: '', inn: '', extra: '' };
+  const forms = ['ИП', 'ООО', 'Самозанятый'];
+  const segBase = 'flex:1;text-align:center;padding:11px 4px;border-radius:9px;font-size:calc(14*var(--sk-u));cursor:pointer;';
+  const formSeg = forms.map((fm) =>
+    `<div data-action="setReqForm" data-form="${fm}" style="${segBase}${r.form === fm ? 'font-weight:600;color:var(--text);background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,0.12)' : 'font-weight:500;color:rgba(var(--label),0.6)'}">${fm}</div>`).join('');
+
+  const inp = (label, key, value, last) =>
+    `<label style="display:block;padding:11px 16px;${last ? '' : 'border-bottom:0.5px solid rgba(var(--label),0.1)'}">
+       <span style="font-size:calc(12*var(--sk-u));color:rgba(var(--label),0.6);font-weight:500">${label}</span>
+       <input value="${esc(value)}" data-input="${key}" style="width:100%;border:none;outline:none;font-size:calc(17*var(--sk-u));color:var(--text);margin-top:4px;background:transparent;font-family:inherit;min-height:28px" />
+     </label>`;
+
+  const body = `
+    <div style="font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.6);padding:8px 24px 8px;letter-spacing:-0.08px">ФОРМА</div>
+    <div style="margin:0 16px;background:var(--seg);border-radius:11px;padding:2px;display:flex;gap:2px">${formSeg}</div>
+    <div style="height:14px"></div>
+    ${skCard(
+      inp('Название / ФИО', 'req-name', r.name || '') +
+      inp('ИНН', 'req-inn', r.inn || '') +
+      inp('Доп. реквизиты', 'req-extra', r.extra || '', true)
+    )}
+    <div style="margin:14px 24px 0;font-size:calc(13*var(--sk-u));color:rgba(var(--label),0.5);line-height:1.45">Подставляются в акт как исполнитель. Реквизиты заказчика вводятся в самом акте.</div>`;
+  return skChrome('Реквизиты для актов', body, 'Настройки');
+}
+
+// ░░░░░ ДИАЛОГ ПОДТВЕРЖДЕНИЯ ░░░░░
+export function confirmDialog(state) {
+  if (!state.confirm) return '';
+  const c = state.confirm;
+  return `
+    <div style="position:absolute;inset:0;z-index:60">
+      <div data-action="confirmNo" style="position:absolute;inset:0;background:rgba(0,0,0,0.45);animation:sk-fade 0.2s ease"></div>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:28px;pointer-events:none">
+        <div style="background:var(--card);border-radius:20px;padding:22px 20px;max-width:320px;width:100%;pointer-events:auto;animation:sk-pop 0.2s ease;box-shadow:0 12px 40px rgba(0,0,0,0.35)">
+          <div style="font-size:calc(16*var(--sk-u));color:var(--text);line-height:1.4;text-align:center">${esc(c.text)}</div>
+          <div style="display:flex;gap:10px;margin-top:20px">
+            <div data-action="confirmNo" style="flex:1;min-height:50px;display:flex;align-items:center;justify-content:center;border-radius:13px;background:var(--seg);color:var(--text);font-size:calc(16*var(--sk-u));font-weight:600;cursor:pointer">Отмена</div>
+            <div data-action="confirmYes" style="flex:1;min-height:50px;display:flex;align-items:center;justify-content:center;border-radius:13px;background:#ff3b30;color:#fff;font-size:calc(16*var(--sk-u));font-weight:600;cursor:pointer">${esc(c.okLabel || 'Удалить')}</div>
+          </div>
+        </div>
+      </div>
     </div>`;
 }
